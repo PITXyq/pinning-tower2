@@ -4,7 +4,6 @@ local Workspace = game:GetService("Workspace")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -81,22 +80,6 @@ local platformStatusLabelRef = nil
 local keybindsLabelRef = nil
 local gVisualizerPartRef = nil
 local hVisualizerPartRef = nil
-
-local Rayfield = nil
-local success, errorMsg = pcall(function()
-    Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-end)
-
-if not success or not Rayfield then
-    warn("Failed to load Rayfield library:", errorMsg)
-    LocalPlayer:Kick("Failed to load required UI library. Please ensure you have internet access.")
-    return
-end
-
-local function getRoot(char)
-	local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
-	return rootPart
-end
 
 local function setVisibilityRecursive(instance, visible, stateStore)
 	if not instance then return end
@@ -584,6 +567,7 @@ local function unmobilefly()
 	print("IY Mobile Fly Disabled")
 end
 
+
 local function toggleFly()
 	FLYING = not FLYING
 	print("Fly Toggled:", FLYING and "ON" or "OFF")
@@ -600,7 +584,8 @@ local function toggleFly()
 			NOFLY()
 		end
 	end
-	if flyToggleRef then flyToggleRef:Set(FLYING) end
+	updateFlyStatusLabel()
+	updateFlyMobileButton()
 end
 
 local function createPlatform()
@@ -657,7 +642,9 @@ local function togglePlatform()
 	else
         warn("Failed to find or create platform part to update properties.")
     end
-    if platformToggleRef then platformToggleRef:Set(isPlatformVisible) end
+
+	updatePlatformStatusLabel()
+	updatePlatformMobileButton()
 end
 
 local function getOrCreateScreenGui()
@@ -804,8 +791,8 @@ local function createMobileUI()
 		button.BorderColor3 = borderColor
 		button.TextColor3 = Color3.fromRGB(255, 255, 255)
 		button.Font = Enum.Font.SourceSansBold
-		button.TextSize = 13
-		button.TextWrapped = true
+		button.TextSize = 13 -- Slightly smaller text size for potentially longer labels
+		button.TextWrapped = true -- Allow text wrapping
 		button.Parent = buttonFrame
 		if clickFunction then
 			button.MouseButton1Click:Connect(clickFunction)
@@ -1073,73 +1060,15 @@ local function detectNearbyPlayersAndTriggerQ_Loop()
 	end
 end
 
-local RayfieldWindow = nil -- Store reference to the window
-
 local uiSuccess, uiError = pcall(function()
     print("Initializing UI and World Objects...")
-
-    RayfieldWindow = Rayfield:CreateWindow({
-        Name = "Script Controls",
-        LoadingTitle = "Loading Script...",
-        LoadingSubtitle = "by You",
-        ConfigurationSaving = { Enabled = false },
-        KeySystem = false
-    })
-
-    local MainTab = RayfieldWindow:CreateTab("Main", 4483362458)
-
-    MainTab:CreateButton({
-        Name = "TP Parts (Q)",
-        Callback = function() pcall(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "UI Button Q") end,
-    })
-    MainTab:CreateButton({
-        Name = "TP Troll Part (E)",
-        Callback = function() pcall(handlePartTeleport, TARGET_PART_NAME_E, TELEPORT_DURATION_E, "UI Button E") end,
-    })
-     MainTab:CreateButton({
-        Name = "TP Location (R)",
-        Callback = function() pcall(teleportPlayerToCoords, TARGET_POSITION_R, "UI Button R") end,
-    })
-    MainTab:CreateLabel("Toggles:")
-    antiFallToggleRef = MainTab:CreateToggle({
-        Name = "Anti-Fall (F)", CurrentValue = isAntiFallEnabled, Flag = "AntiFallToggle",
-        Callback = function(Value) if isAntiFallEnabled ~= Value then toggleAntiFall() end end,
-    })
-    gFuncToggleRef = MainTab:CreateToggle({
-        Name = "Detect E (G)", CurrentValue = isGFuncEnabled, Flag = "DetectEToggle",
-        Callback = function(Value) if isGFuncEnabled ~= Value then toggleGFunc() end end,
-    })
-     hFuncToggleRef = MainTab:CreateToggle({
-        Name = "Detect Q (H)", CurrentValue = isHFuncEnabled, Flag = "DetectQToggle",
-        Callback = function(Value) if isHFuncEnabled ~= Value then toggleHFunc() end end,
-    })
-    flyToggleRef = MainTab:CreateToggle({
-        Name = "Fly (X)", CurrentValue = FLYING, Flag = "FlyToggle",
-        Callback = function(Value) if FLYING ~= Value then toggleFly() end end,
-    })
-    platformToggleRef = MainTab:CreateToggle({
-        Name = "Platform (P)", CurrentValue = isPlatformVisible, Flag = "PlatformToggle",
-        Callback = function(Value) if isPlatformVisible ~= Value then togglePlatform() end end,
-    })
-
-    local OptionsTab = RayfieldWindow:CreateTab("UI Options", 4483362458) -- Use a different icon if desired
-
-    OptionsTab:CreateButton({
-        Name = "Load Old Mobile UI",
-        Callback = function()
-            print("Loading Old UI...")
-            if RayfieldWindow then
-                RayfieldWindow:Destroy() -- Destroy the Rayfield UI
-                RayfieldWindow = nil -- Clear the reference
-            end
-            -- Call functions to create the old UI
-            -- Ensure these functions are defined before this point
-            pcall(createStatusLabelsUI)
-            pcall(createMobileUI)
-            if not UserInputService.TouchEnabled then pcall(createKeybindsLabelUI) end
-        end,
-    })
-
+	createStatusLabelsUI()
+	if not UserInputService.TouchEnabled then
+		createKeybindsLabelUI()
+	end
+	if UserInputService.TouchEnabled then
+		createMobileUI()
+	end
 	createDetectionVisualizers()
     createPlatform()
     print("Initialization complete.")
@@ -1174,23 +1103,18 @@ local inputSuccess, inputError = pcall(function()
 		elseif keyCode == TRIGGER_KEY_F then
             print("F Key Pressed")
 			pcall(toggleAntiFall)
-            if antiFallToggleRef then antiFallToggleRef:Set(isAntiFallEnabled) end
 		elseif keyCode == TRIGGER_KEY_G then
             print("G Key Pressed")
 			pcall(toggleGFunc)
-            if gFuncToggleRef then gFuncToggleRef:Set(isGFuncEnabled) end
 		elseif keyCode == TRIGGER_KEY_H then
             print("H Key Pressed")
 			pcall(toggleHFunc)
-            if hFuncToggleRef then hFuncToggleRef:Set(isHFuncEnabled) end
 		elseif keyCode == TRIGGER_KEY_FLY then
             print("X Key Pressed")
             pcall(toggleFly)
-            if flyToggleRef then flyToggleRef:Set(FLYING) end
         elseif keyCode == TRIGGER_KEY_PLATFORM then
             print("P Key Pressed")
             pcall(togglePlatform)
-            if platformToggleRef then platformToggleRef:Set(isPlatformVisible) end
 		end
 	end)
 end)
@@ -1224,5 +1148,8 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     end
     createDetectionVisualizers()
     createPlatform()
+    createStatusLabelsUI()
+    if not UserInputService.TouchEnabled then createKeybindsLabelUI() end
+    if UserInputService.TouchEnabled then createMobileUI() end
     print("Respawn setup complete.")
 end)
