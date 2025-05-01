@@ -505,7 +505,7 @@ local function mobilefly()
 		local direction = Humanoid.MoveDirection
 		local currentSpeed = iyflyspeed * 50
 
-		if direction.Magnitude > 0.1 then
+		if direction.Magnitude > 0.01 then
 			local lookVector = camera.CFrame.LookVector
 			local rightVector = camera.CFrame.RightVector
 			local moveDir = (lookVector * -direction.Z) + (rightVector * direction.X)
