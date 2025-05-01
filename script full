@@ -166,9 +166,9 @@ local function handlePartTeleport(targetPartName, teleportDuration, triggerSourc
                     if originalChildrenData[part] and originalChildrenData[part].Transparency then
                         pcall(function() part.Transparency = originalChildrenData[part].Transparency end)
                     elseif originalStateData[part] and originalStateData[part].children[part] then
-                        pcall(function() part.Transparency = originalStateData[part].children[part].Transparency end)
+                         pcall(function() part.Transparency = originalStateData[part].children[part].Transparency end)
                     else
-                        pcall(function() part.Transparency = 0 end)
+                         pcall(function() part.Transparency = 0 end)
                     end
 				end
 			end
@@ -193,6 +193,7 @@ local function teleportPlayerToCoords(targetPosition, triggerSource)
 	currentHumanoidRootPart.CFrame = CFrame.new(targetPosition)
 end
 
+
 local function updateAntiFallStatusLabel()
 	if antiFallStatusLabelRef then
 		if isAntiFallEnabled then
@@ -207,10 +208,10 @@ end
 local function updateGFuncStatusLabel()
 	if gFuncStatusLabelRef then
 		if isGFuncEnabled then
-			gFuncStatusLabelRef.Text = "Detect E: Enabled"
+			gFuncStatusLabelRef.Text = "Troll Detect: Enabled"
 			gFuncStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
 		else
-			gFuncStatusLabelRef.Text = "Detect E: Disabled"
+			gFuncStatusLabelRef.Text = "Troll Detect: Disabled"
 			gFuncStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
 		end
 	end
@@ -218,10 +219,10 @@ end
 local function updateHFuncStatusLabel()
 	if hFuncStatusLabelRef then
 		if isHFuncEnabled then
-			hFuncStatusLabelRef.Text = "Detect Q: Enabled"
+			hFuncStatusLabelRef.Text = "Other Detect: Enabled"
 			hFuncStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
 		else
-			hFuncStatusLabelRef.Text = "Detect Q: Disabled"
+			hFuncStatusLabelRef.Text = "Other Detect: Disabled"
 			hFuncStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
 		end
 	end
@@ -265,11 +266,11 @@ end
 local function updateGFuncMobileButton()
 	if gFuncButtonRef then
 		if isGFuncEnabled then
-			gFuncButtonRef.Text = "G: Detect E ON"
+			gFuncButtonRef.Text = "G: Troll Detect ON"
 			gFuncButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 			gFuncButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
 		else
-			gFuncButtonRef.Text = "G: Detect E OFF"
+			gFuncButtonRef.Text = "G: Troll Detect OFF"
 			gFuncButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 			gFuncButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
 		end
@@ -278,11 +279,11 @@ end
 local function updateHFuncMobileButton()
 	if hFuncButtonRef then
 		if isHFuncEnabled then
-			hFuncButtonRef.Text = "H: Detect Q ON"
+			hFuncButtonRef.Text = "H: Other Detect ON"
 			hFuncButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 			hFuncButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
 		else
-			hFuncButtonRef.Text = "H: Detect Q OFF"
+			hFuncButtonRef.Text = "H: Other Detect OFF"
 			hFuncButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 			hFuncButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
 		end
@@ -315,6 +316,7 @@ local function updatePlatformMobileButton()
 	end
 end
 
+
 local function toggleAntiFall()
 	isAntiFallEnabled = not isAntiFallEnabled
 	print("Anti-Fall Toggled:", isAntiFallEnabled and "ON" or "OFF")
@@ -323,7 +325,7 @@ local function toggleAntiFall()
 end
 local function toggleGFunc()
 	isGFuncEnabled = not isGFuncEnabled
-	print("Player Detection (G -> E) Toggled:", isGFuncEnabled and "ON" or "OFF")
+	print("Player Detection (G -> Troll) Toggled:", isGFuncEnabled and "ON" or "OFF")
 	updateGFuncStatusLabel()
 	updateGFuncMobileButton()
 	if gVisualizerPartRef then gVisualizerPartRef.Visible = isGFuncEnabled end
@@ -331,7 +333,7 @@ local function toggleGFunc()
 end
 local function toggleHFunc()
 	isHFuncEnabled = not isHFuncEnabled
-	print("Player Detection (H -> Q) Toggled:", isHFuncEnabled and "ON" or "OFF")
+	print("Player Detection (H -> Other) Toggled:", isHFuncEnabled and "ON" or "OFF")
 	updateHFuncStatusLabel()
 	updateHFuncMobileButton()
 	if hVisualizerPartRef then hVisualizerPartRef.Visible = isHFuncEnabled end
@@ -354,7 +356,6 @@ local function NOFLY()
 	end
 	flyBG = nil
 	flyBV = nil
-
 	if Humanoid then Humanoid.PlatformStand = false end
 	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
 	print("IY Fly Disabled")
@@ -407,7 +408,6 @@ local function sFLY(vfly)
 				local camFrame = workspace.CurrentCamera.CFrame
 				local lookVector = camFrame.lookVector
 				local rightVector = camFrame.rightVector
-				local upVector = camFrame.upVector
 
 				local moveDir = (lookVector * (CONTROL.F + CONTROL.B)) + (rightVector * (CONTROL.L + CONTROL.R))
 				local verticalDir = Vector3.new(0, (CONTROL.Q + CONTROL.E), 0)
@@ -420,7 +420,6 @@ local function sFLY(vfly)
 				local lookVector = camFrame.lookVector
 				local rightVector = camFrame.rightVector
 				local moveDir = (lookVector * (lCONTROL.F + lCONTROL.B)) + (rightVector * (lCONTROL.L + lCONTROL.R))
-				flyBV.velocity = moveDir * SPEED * currentSpeed
 				flyBV.velocity = Vector3.new(0,0,0)
 				SPEED = 0
 			else
@@ -495,7 +494,7 @@ local function mobilefly()
 	flyRenderStepConnection = RunService.RenderStepped:Connect(function()
 		if not FLYING or not Character or not Humanoid or not T or not T.Parent or not flyBV or not flyBV.Parent or not flyBG or not flyBG.Parent then
 			if flyRenderStepConnection then flyRenderStepConnection:Disconnect(); flyRenderStepConnection = nil end
-			NOFLY()
+			unmobilefly()
 			return
 		end
 
@@ -540,7 +539,7 @@ local function mobilefly()
 				print("Mobile fly movers re-created on respawn.")
 			else
 				warn("Failed to re-create mobile fly movers on respawn: RootPart not found.")
-				NOFLY()
+				unmobilefly()
 			end
 		end
 	end)
@@ -588,6 +587,7 @@ local function toggleFly()
 	updateFlyMobileButton()
 end
 
+
 local function createPlatform()
 	if platformPartRef and platformPartRef.Parent then
         print("Platform already exists.")
@@ -607,7 +607,7 @@ local function createPlatform()
 	platformPartRef.Color = PLATFORM_COLOR
 	platformPartRef.Material = Enum.Material.Plastic
 	platformPartRef.Anchored = PLATFORM_ANCHORED
-    platformPartRef.Transparency = isPlatformVisible and PLATFORM_TRANSPARENCY_VISIBLE or PLATFORM_TRANSPARENCY_HIDDEN
+	platformPartRef.Transparency = isPlatformVisible and PLATFORM_TRANSPARENCY_VISIBLE or PLATFORM_TRANSPARENCY_HIDDEN
 	platformPartRef.CanCollide = isPlatformVisible and PLATFORM_CAN_COLLIDE or false
     platformPartRef.CanTouch = isPlatformVisible
     platformPartRef.CanQuery = isPlatformVisible
@@ -647,6 +647,7 @@ local function togglePlatform()
 	updatePlatformMobileButton()
 end
 
+
 local function getOrCreateScreenGui()
 	local screenGui = PlayerGui:FindFirstChild("TeleportControlsScreenGui")
 	if not screenGui then
@@ -664,7 +665,7 @@ local function createStatusLabelsUI()
 	local screenGui = getOrCreateScreenGui()
 	local children = screenGui:GetChildren()
 	for _, child in ipairs(children) do
-		if child.Name:match("StatusLabel$") then
+		if child.Name:match("StatusLabel$") or child.Name:match("Status$") then
 			child:Destroy()
 		end
 	end
@@ -711,7 +712,6 @@ local function createKeybindsLabelUI()
 
 	local guiInset = GuiService:GetGuiInset()
 	local topPadding = 5
-	local labelSpacing = 5
 	local labelHeight = 110
 	local labelWidth = 150
 
@@ -744,7 +744,7 @@ local function createKeybindsLabelUI()
 	keybindsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	keybindsLabel.TextYAlignment = Enum.TextYAlignment.Top
 	keybindsLabel.Text = string.format(
-        "%s: TP Parts\n%s: TP Troll Part\n%s: TP To Location\n%s: Toggle AntiFall\n%s: Toggle Detect E\n%s: Toggle Detect Q\n%s: Toggle Fly\n%s: Toggle Platform",
+        "%s: other buttons\n%s: Troll button\n%s: TP To Location\n%s: Toggle AntiFall\n%s: Toggle Troll Detect\n%s: Toggle Other Detect\n%s: Toggle Fly\n%s: Toggle Platform",
         TRIGGER_KEY_Q.Name, TRIGGER_KEY_E.Name, TRIGGER_KEY_R.Name, TRIGGER_KEY_F.Name,
         TRIGGER_KEY_G.Name, TRIGGER_KEY_H.Name, TRIGGER_KEY_FLY.Name, TRIGGER_KEY_PLATFORM.Name
     )
@@ -791,8 +791,8 @@ local function createMobileUI()
 		button.BorderColor3 = borderColor
 		button.TextColor3 = Color3.fromRGB(255, 255, 255)
 		button.Font = Enum.Font.SourceSansBold
-		button.TextSize = 13 -- Slightly smaller text size for potentially longer labels
-		button.TextWrapped = true -- Allow text wrapping
+		button.TextSize = 13
+		button.TextWrapped = true
 		button.Parent = buttonFrame
 		if clickFunction then
 			button.MouseButton1Click:Connect(clickFunction)
@@ -800,13 +800,13 @@ local function createMobileUI()
 		return button
 	end
 
-	local buttonQ = createMobileButton("TeleportButtonQ", "Q: TP Parts", 0, 0, Color3.fromRGB(80, 80, 200), Color3.fromRGB(20, 20, 50), function() handlePartTeleport(TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Button Q") end)
-	local buttonE = createMobileButton("TeleportButtonE", "E: TP Troll", 0, 1, Color3.fromRGB(200, 80, 80), Color3.fromRGB(50, 20, 20), function() handlePartTeleport(TARGET_PART_NAME_E, TELEPORT_DURATION_E, "Button E") end)
+	local buttonQ = createMobileButton("TeleportButtonQ", "Q: other buttons", 0, 0, Color3.fromRGB(80, 80, 200), Color3.fromRGB(20, 20, 50), function() handlePartTeleport(TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Button Q") end)
+	local buttonE = createMobileButton("TeleportButtonE", "E: Troll button", 0, 1, Color3.fromRGB(200, 80, 80), Color3.fromRGB(50, 20, 20), function() handlePartTeleport(TARGET_PART_NAME_E, TELEPORT_DURATION_E, "Button E") end)
 	local buttonR = createMobileButton("TeleportButtonR", "R: TP Loc", 0, 2, Color3.fromRGB(80, 200, 80), Color3.fromRGB(20, 50, 20), function() teleportPlayerToCoords(TARGET_POSITION_R, "Button R") end)
 	antiFallButtonRef = createMobileButton("AntiFallButton", "F: AntiFall", 0, 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleAntiFall)
 
-	gFuncButtonRef = createMobileButton("DetectButtonG", "G: Detect E", 1, 0, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleGFunc)
-	hFuncButtonRef = createMobileButton("DetectButtonH", "H: Detect Q", 1, 1, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleHFunc)
+	gFuncButtonRef = createMobileButton("DetectButtonG", "G: Troll Detect", 1, 0, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleGFunc)
+	hFuncButtonRef = createMobileButton("DetectButtonH", "H: Other Detect", 1, 1, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleHFunc)
 	flyButtonRef = createMobileButton("FlyButton", "X: Fly", 1, 2, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleFly)
 	platformButtonRef = createMobileButton("PlatformButton", "P: Platform", 1, 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), togglePlatform)
 
@@ -939,6 +939,7 @@ local function createDetectionVisualizers()
         print("Updating G Visualizer position to Y:", DETECT_POSITION_G.Y)
         gVisualizerPartRef.Position = DETECT_POSITION_G
 	end
+
 	if not hVisualizerPartRef or not hVisualizerPartRef.Parent then
         if hVisualizerPartRef then hVisualizerPartRef:Destroy() end
 		local sphereH = Instance.new("Part")
@@ -973,6 +974,7 @@ local function createDetectionVisualizers()
         print("Cleaned up visualizers, platform, and fly state.")
 	end)
 end
+
 
 RunService.RenderStepped:Connect(function(deltaTime)
 	if isAntiFallEnabled then
@@ -1012,7 +1014,7 @@ local function detectNearbyPlayersAndTriggerE_Loop()
 							if hrp then
 								local distance = (hrp.Position - DETECT_POSITION_G).Magnitude
 								if distance <= DETECTION_RADIUS_G then
-									print("DEBUG: Player '"..player.Name.."' detected near G (Dist: "..string.format("%.2f", distance).."). Triggering E.")
+									print("DEBUG: Player '"..player.Name.."' detected near G (Dist: "..string.format("%.2f", distance).."). Triggering Troll button (E).")
 									task.spawn(handlePartTeleport, TARGET_PART_NAME_E, TELEPORT_DURATION_E, "G Detection")
 									lastPlayerDetectTime_G = currentTime
 									foundTarget = true
@@ -1045,7 +1047,7 @@ local function detectNearbyPlayersAndTriggerQ_Loop()
 							if hrp then
 								local distance = (hrp.Position - TARGET_POSITION_H).Magnitude
 								if distance <= DETECTION_RADIUS_H then
-									print("Player '"..player.Name.."' detected near H (Dist: "..string.format("%.2f", distance).."). Triggering Q.")
+									print("Player '"..player.Name.."' detected near H (Dist: "..string.format("%.2f", distance).."). Triggering other buttons (Q).")
 									task.spawn(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "H Detection")
 									lastPlayerDetectTime_H = currentTime
 									foundTarget = true
@@ -1092,10 +1094,10 @@ local inputSuccess, inputError = pcall(function()
 		local keyCode = input.KeyCode
 
 		if keyCode == TRIGGER_KEY_Q then
-            print("Q Key Pressed")
+            print("Q Key Pressed (other buttons)")
 			pcall(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Q Key")
 		elseif keyCode == TRIGGER_KEY_E then
-            print("E Key Pressed")
+            print("E Key Pressed (Troll button)")
 			pcall(handlePartTeleport, TARGET_PART_NAME_E, TELEPORT_DURATION_E, "E Key")
 		elseif keyCode == TRIGGER_KEY_R then
             print("R Key Pressed")
