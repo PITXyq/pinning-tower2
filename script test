@@ -1,26 +1,3 @@
---[[
-    Script Features:
-    - Q Key: Teleport parts named TARGET_PART_NAME_Q to the player.
-    - E Key: Teleport parts named TARGET_PART_NAME_E (troll part) to the player.
-    - R Key: Teleport player to TARGET_POSITION_R.
-    - F Key: Toggle Anti-Fall mechanism (teleports player up if falling below threshold).
-    - G Key: Toggle detection of nearby players near DETECT_POSITION_G (original height) to trigger the E function automatically.
-    - H Key: Toggle detection of nearby players near TARGET_POSITION_H to trigger the Q function automatically.
-    - X Key: Toggle Fly mode (Infinite Yield style).
-    - P Key: Toggle visibility of a large platform at TARGET_POSITION_G (slightly lowered height).
-    - Mobile UI: Buttons for all keybind actions and toggles. Draggable toggle button.
-    - Status UI: Displays the current state (Enabled/Disabled) for Anti-Fall, G Detect, H Detect, Fly, and Platform.
-    - Keybind Info UI: Displays keybinds (Desktop only).
-    - Detection Visualizers: Spheres showing the detection radius for G (original height) and H functions.
-
-    v8 Changes:
-    - Replaced Fly Logic: Integrated fly system from Infinite Yield script.
-    - Adapted Input: Modified fly controls to use UserInputService instead of IYMouse.
-    - Adapted Mobile Fly: Uses Humanoid.MoveDirection for mobile fly input.
-    - Adjusted Platform Height: Set Y-coordinate of TARGET_POSITION_G to 7 units below original.
-]]
-
--- Services
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -28,17 +5,15 @@ local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
--- Player specific variables
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- Configuration Variables
-local TARGET_PART_NAME_Q = "사라지는 파트" -- Renamed from X
+local TARGET_PART_NAME_Q = "사라지는 파트"
 local TELEPORT_DURATION_Q = 0.1
-local TRIGGER_KEY_Q = Enum.KeyCode.Q -- Changed from X
+local TRIGGER_KEY_Q = Enum.KeyCode.Q
 
 local TARGET_PART_NAME_E = "Gudock"
 local TELEPORT_DURATION_E = 0.1
@@ -52,10 +27,8 @@ local ANTI_FALL_Y_THRESHOLD = TARGET_POSITION_R.Y - 50
 local ANTI_FALL_COOLDOWN = 1
 
 local TRIGGER_KEY_G = Enum.KeyCode.G
--- *** Position for E Detection (Original Height) ***
 local DETECT_POSITION_G = Vector3.new(-41.8089943, 147.146271, -80.9691467)
--- *** Position for Platform (Slightly Lowered) ***
-local TARGET_POSITION_G = Vector3.new(-41.8089943, 147.146271 - 7, -80.9691467) -- Platform position remains lowered
+local TARGET_POSITION_G = Vector3.new(-41.8089943, 147.146271 - 7, -80.9691467)
 local DETECTION_RADIUS_G = 5
 local PLAYER_DETECT_COOLDOWN_G = 0.5
 
@@ -64,29 +37,26 @@ local TARGET_POSITION_H = Vector3.new(-78.8984604, 147.146271, -39.3039017)
 local DETECTION_RADIUS_H = 15
 local PLAYER_DETECT_COOLDOWN_H = PLAYER_DETECT_COOLDOWN_G
 
--- *** NEW: Fly Configuration (IY Style) ***
-local TRIGGER_KEY_FLY = Enum.KeyCode.X -- New keybind for fly
-local FLYING = false -- Renamed from isFlying to match IY
-local QEfly = true -- Option for Q/E vertical movement (IY default)
-local iyflyspeed = 1 -- Base speed multiplier (IY default)
-local vehicleflyspeed = 1 -- Not used in this integration, but kept for structure
-local flyKeyDownConnection = nil -- Connection for key down listener
-local flyKeyUpConnection = nil -- Connection for key up listener
-local flyRenderStepConnection = nil -- Connection for mobile fly loop
-local flyCharacterAddedConnection = nil -- Connection for mobile fly character respawn
+local TRIGGER_KEY_FLY = Enum.KeyCode.X
+local FLYING = false
+local QEfly = true
+local iyflyspeed = 1
+local vehicleflyspeed = 1
+local flyKeyDownConnection = nil
+local flyKeyUpConnection = nil
+local flyRenderStepConnection = nil
+local flyCharacterAddedConnection = nil
 
--- NEW: Platform Configuration
-local TRIGGER_KEY_PLATFORM = Enum.KeyCode.P -- New keybind for platform
-local PLATFORM_SIZE = Vector3.new(200, 5, 200) -- Large platform size
+local TRIGGER_KEY_PLATFORM = Enum.KeyCode.P
+local PLATFORM_SIZE = Vector3.new(200, 5, 200)
 local PLATFORM_COLOR = Color3.fromRGB(100, 200, 255)
-local PLATFORM_TRANSPARENCY_VISIBLE = 0.5 -- Transparency when visible
-local PLATFORM_TRANSPARENCY_HIDDEN = 1     -- Transparency when hidden
+local PLATFORM_TRANSPARENCY_VISIBLE = 0.5
+local PLATFORM_TRANSPARENCY_HIDDEN = 1
 local PLATFORM_ANCHORED = true
 local PLATFORM_CAN_COLLIDE = true
-local isPlatformVisible = false -- Start hidden
-local platformPartRef = nil -- Reference to the created platform part
+local isPlatformVisible = false
+local platformPartRef = nil
 
--- State Variables
 local isPartTeleporting = false
 local originalStateData = {}
 local isAntiFallEnabled = false
@@ -96,27 +66,21 @@ local lastPlayerDetectTime_G = 0
 local isHFuncEnabled = false
 local lastPlayerDetectTime_H = 0
 
--- UI Element References
 local antiFallButtonRef = nil
 local gFuncButtonRef = nil
 local hFuncButtonRef = nil
-local flyButtonRef = nil -- NEW
-local platformButtonRef = nil -- NEW
+local flyButtonRef = nil
+local platformButtonRef = nil
 local uiToggleButtonRef = nil
 local antiFallStatusLabelRef = nil
 local gFuncStatusLabelRef = nil
 local hFuncStatusLabelRef = nil
-local flyStatusLabelRef = nil -- NEW
-local platformStatusLabelRef = nil -- NEW
+local flyStatusLabelRef = nil
+local platformStatusLabelRef = nil
 local keybindsLabelRef = nil
 local gVisualizerPartRef = nil
 local hVisualizerPartRef = nil
 
---[[
-    Utility function to recursively set the visibility of an instance and its descendants.
-    Stores the original state to restore it later.
-    Used primarily for the E function's part hiding.
-]]
 local function setVisibilityRecursive(instance, visible, stateStore)
 	if not instance then return end
 	local originalProps = {}
@@ -128,26 +92,18 @@ local function setVisibilityRecursive(instance, visible, stateStore)
 		originalProps.Transparency = instance.Transparency
 		instance.Transparency = visible and originalProps.Transparency or 1
 	end
-	-- Handle other visual elements
 	if instance:IsA("SurfaceGui") or instance:IsA("ParticleEmitter") or instance:IsA("PointLight") or instance:IsA("SpotLight") or instance:IsA("SurfaceLight") or instance:IsA("Highlight") then
 		originalProps.Enabled = instance.Enabled
 		instance.Enabled = visible and originalProps.Enabled or false
 	end
-	-- Store original properties only if hiding
 	if not visible and next(originalProps) then
 		stateStore[instance] = originalProps
 	end
-	-- Recurse through children
 	for _, child in ipairs(instance:GetChildren()) do
 		setVisibilityRecursive(child, visible, stateStore)
 	end
 end
 
---[[
-    Handles teleporting parts with a specific name to the player's location.
-    Makes them non-collidable and potentially invisible during the teleport.
-    Restores their original state after a duration.
-]]
 local function handlePartTeleport(targetPartName, teleportDuration, triggerSource)
 	if isPartTeleporting then print("Part teleport already in progress (requested by " .. triggerSource .. ")."); return end
 	local player = LocalPlayer
@@ -157,18 +113,16 @@ local function handlePartTeleport(targetPartName, teleportDuration, triggerSourc
 
 	print(triggerSource .. " action triggered, searching for parts named:", targetPartName)
 	isPartTeleporting = true
-	originalStateData = {} -- Clear previous state
+	originalStateData = {}
 	local partsToTeleport = {}
 	local foundParts = false
 
-	-- Find all parts matching the target name in the Workspace
 	for _, descendant in ipairs(Workspace:GetDescendants()) do
 		if descendant:IsA("BasePart") and descendant.Name == targetPartName then
 			table.insert(partsToTeleport, descendant)
-			-- Store original properties
 			originalStateData[descendant] = {
 				main = { CFrame = descendant.CFrame, Anchored = descendant.Anchored, CanCollide = descendant.CanCollide },
-				children = {} -- Store children states if needed (for E func)
+				children = {}
 			}
 			foundParts = true
 		end
@@ -178,24 +132,20 @@ local function handlePartTeleport(targetPartName, teleportDuration, triggerSourc
 		print("Found", #partsToTeleport, "parts via " .. triggerSource .. ". Teleporting them...")
 		local targetCFrame = currentHumanoidRootPart.CFrame
 
-		-- Teleport parts to player
 		for _, part in ipairs(partsToTeleport) do
 			if part and part.Parent and originalStateData[part] then
-				part.Anchored = true -- Anchor temporarily
-				part.CanCollide = false -- Disable collision
-				-- Special handling for E key part (hide visuals)
-				if targetPartName == TARGET_PART_NAME_E and triggerSource ~= "H Detection" then -- H detection uses Q parts, not E
+				part.Anchored = true
+				part.CanCollide = false
+				if targetPartName == TARGET_PART_NAME_E and triggerSource ~= "H Detection" then
 					setVisibilityRecursive(part, false, originalStateData[part].children)
 				end
-				part.CFrame = targetCFrame -- Move to player
+				part.CFrame = targetCFrame
 			end
 		end
 
-		-- Wait for the specified duration
 		task.wait(teleportDuration)
 		print("Returning parts triggered by " .. triggerSource .. "...")
 
-		-- Return parts to original state
 		for _, part in ipairs(partsToTeleport) do
 			if part and part.Parent and originalStateData[part] then
 				local originalMainData = originalStateData[part].main
@@ -205,9 +155,7 @@ local function handlePartTeleport(targetPartName, teleportDuration, triggerSourc
 				part.Anchored = originalMainData.Anchored
 				part.CanCollide = originalMainData.CanCollide
 
-				-- Restore visibility for E key part
 				if targetPartName == TARGET_PART_NAME_E and triggerSource ~= "H Detection" then
-					-- Restore children properties
 					for instance, props in pairs(originalChildrenData) do
 						if instance and instance.Parent then
 							for propName, originalValue in pairs(props) do
@@ -215,13 +163,12 @@ local function handlePartTeleport(targetPartName, teleportDuration, triggerSourc
 							end
 						end
 					end
-					-- Restore main part transparency if it was stored, otherwise default to 0
                     if originalChildrenData[part] and originalChildrenData[part].Transparency then
                         pcall(function() part.Transparency = originalChildrenData[part].Transparency end)
-                    elseif originalStateData[part] and originalStateData[part].children[part] then -- Check if stored under children key
+                    elseif originalStateData[part] and originalStateData[part].children[part] then
                         pcall(function() part.Transparency = originalStateData[part].children[part].Transparency end)
                     else
-                        pcall(function() part.Transparency = 0 end) -- Fallback if not explicitly stored
+                        pcall(function() part.Transparency = 0 end)
                     end
 				end
 			end
@@ -232,13 +179,9 @@ local function handlePartTeleport(targetPartName, teleportDuration, triggerSourc
 	end
 
 	isPartTeleporting = false
-	originalStateData = {} -- Clear state data after completion
+	originalStateData = {}
 end
 
-
---[[
-    Teleports the local player to the specified target position.
-]]
 local function teleportPlayerToCoords(targetPosition, triggerSource)
 	local player = LocalPlayer
 	local character = player.Character
@@ -250,15 +193,14 @@ local function teleportPlayerToCoords(targetPosition, triggerSource)
 	currentHumanoidRootPart.CFrame = CFrame.new(targetPosition)
 end
 
--- --- Status Label Update Functions ---
 local function updateAntiFallStatusLabel()
 	if antiFallStatusLabelRef then
 		if isAntiFallEnabled then
 			antiFallStatusLabelRef.Text = "Anti-Fall: Enabled"
-			antiFallStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0) -- Green
+			antiFallStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
 		else
 			antiFallStatusLabelRef.Text = "Anti-Fall: Disabled"
-			antiFallStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0) -- Red
+			antiFallStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
 		end
 	end
 end
@@ -276,18 +218,17 @@ end
 local function updateHFuncStatusLabel()
 	if hFuncStatusLabelRef then
 		if isHFuncEnabled then
-			hFuncStatusLabelRef.Text = "Detect Q: Enabled" -- Updated from X to Q
+			hFuncStatusLabelRef.Text = "Detect Q: Enabled"
 			hFuncStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
 		else
-			hFuncStatusLabelRef.Text = "Detect Q: Disabled" -- Updated from X to Q
+			hFuncStatusLabelRef.Text = "Detect Q: Disabled"
 			hFuncStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
 		end
 	end
 end
--- NEW: Update Fly Status Label
 local function updateFlyStatusLabel()
 	if flyStatusLabelRef then
-		if FLYING then -- Changed from isFlying
+		if FLYING then
 			flyStatusLabelRef.Text = "Fly: Enabled"
 			flyStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
 		else
@@ -296,7 +237,6 @@ local function updateFlyStatusLabel()
 		end
 	end
 end
--- NEW: Update Platform Status Label
 local function updatePlatformStatusLabel()
 	if platformStatusLabelRef then
 		if isPlatformVisible then
@@ -309,16 +249,15 @@ local function updatePlatformStatusLabel()
 	end
 end
 
--- --- Mobile Button Update Functions ---
 local function updateAntiFallMobileButton()
 	if antiFallButtonRef then
 		if isAntiFallEnabled then
 			antiFallButtonRef.Text = "F - AntiFall ON"
-			antiFallButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- Greenish
+			antiFallButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 			antiFallButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
 		else
 			antiFallButtonRef.Text = "F - AntiFall OFF"
-			antiFallButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Reddish
+			antiFallButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 			antiFallButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
 		end
 	end
@@ -339,20 +278,19 @@ end
 local function updateHFuncMobileButton()
 	if hFuncButtonRef then
 		if isHFuncEnabled then
-			hFuncButtonRef.Text = "H - DetectQ ON" -- Updated from X to Q
+			hFuncButtonRef.Text = "H - DetectQ ON"
 			hFuncButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 			hFuncButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
 		else
-			hFuncButtonRef.Text = "H - DetectQ OFF" -- Updated from X to Q
+			hFuncButtonRef.Text = "H - DetectQ OFF"
 			hFuncButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 			hFuncButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
 		end
 	end
 end
--- NEW: Update Fly Mobile Button
 local function updateFlyMobileButton()
 	if flyButtonRef then
-		if FLYING then -- Changed from isFlying
+		if FLYING then
 			flyButtonRef.Text = "X - Fly ON"
 			flyButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
 			flyButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -363,7 +301,6 @@ local function updateFlyMobileButton()
 		end
 	end
 end
--- NEW: Update Platform Mobile Button
 local function updatePlatformMobileButton()
 	if platformButtonRef then
 		if isPlatformVisible then
@@ -378,7 +315,6 @@ local function updatePlatformMobileButton()
 	end
 end
 
--- --- Toggle Functions ---
 local function toggleAntiFall()
 	isAntiFallEnabled = not isAntiFallEnabled
 	print("Anti-Fall Toggled:", isAntiFallEnabled and "ON" or "OFF")
@@ -391,28 +327,26 @@ local function toggleGFunc()
 	updateGFuncStatusLabel()
 	updateGFuncMobileButton()
 	if gVisualizerPartRef then gVisualizerPartRef.Visible = isGFuncEnabled end
-    print("DEBUG: isGFuncEnabled set to:", isGFuncEnabled) -- Debug print
+    print("DEBUG: isGFuncEnabled set to:", isGFuncEnabled)
 end
 local function toggleHFunc()
 	isHFuncEnabled = not isHFuncEnabled
-	print("Player Detection (H -> Q) Toggled:", isHFuncEnabled and "ON" or "OFF") -- Updated X to Q
+	print("Player Detection (H -> Q) Toggled:", isHFuncEnabled and "ON" or "OFF")
 	updateHFuncStatusLabel()
 	updateHFuncMobileButton()
 	if hVisualizerPartRef then hVisualizerPartRef.Visible = isHFuncEnabled end
 end
 
--- *** NEW: Fly Toggle Logic (IY Style) ***
-local CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0} -- Fly control state
+local CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
 local lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
 local SPEED = 0
-local flyBG = nil -- BodyGyro reference
-local flyBV = nil -- BodyVelocity reference
+local flyBG = nil
+local flyBV = nil
 
 local function NOFLY()
 	FLYING = false
 	if flyKeyDownConnection then flyKeyDownConnection:Disconnect(); flyKeyDownConnection = nil end
 	if flyKeyUpConnection then flyKeyUpConnection:Disconnect(); flyKeyUpConnection = nil end
-	-- Destroy BodyMovers if they exist
 	local currentRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
 	if currentRootPart then
 		if flyBG and flyBG.Parent == currentRootPart then flyBG:Destroy() end
@@ -426,32 +360,28 @@ local function NOFLY()
 	print("IY Fly Disabled")
 end
 
-local function sFLY(vfly) -- vfly parameter is kept for structure but not used here
-	if FLYING then NOFLY() end -- Stop previous fly if any
-	wait() -- Ensure character references are valid
+local function sFLY(vfly)
+	if FLYING then NOFLY() end
+	wait()
 	if not Character or not Humanoid or not HumanoidRootPart then print("Cannot start fly: Character components missing."); return end
 
 	FLYING = true
-	local T = HumanoidRootPart -- Use the existing HumanoidRootPart reference
+	local T = HumanoidRootPart
 
-	-- Clean up old movers just in case
 	if flyBG and flyBG.Parent then flyBG:Destroy() end
 	if flyBV and flyBV.Parent then flyBV:Destroy() end
 
-	-- Create BodyGyro
 	flyBG = Instance.new('BodyGyro')
 	flyBG.P = 9e4
 	flyBG.Parent = T
 	flyBG.maxTorque = Vector3.new(9e9, 9e9, 9e9)
 	flyBG.cframe = T.CFrame
 
-	-- Create BodyVelocity
 	flyBV = Instance.new('BodyVelocity')
 	flyBV.Parent = T
 	flyBV.velocity = Vector3.new(0, 0, 0)
 	flyBV.maxForce = Vector3.new(9e9, 9e9, 9e9)
 
-	-- Reset controls
 	CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
 	lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
 	SPEED = 0
@@ -460,7 +390,7 @@ local function sFLY(vfly) -- vfly parameter is kept for structure but not used h
 		local flyLoopActive = true
 		local connection = RunService.Heartbeat:Connect(function()
 			if not FLYING or not flyBV or not flyBV.Parent or not flyBG or not flyBG.Parent then
-				flyLoopActive = false -- Stop loop if fly is disabled or movers are gone
+				flyLoopActive = false
 				return
 			end
 			if Humanoid then Humanoid.PlatformStand = true end
@@ -471,43 +401,39 @@ local function sFLY(vfly) -- vfly parameter is kept for structure but not used h
 				SPEED = 0
 			end
 
-			local currentSpeed = (vfly and vehicleflyspeed or iyflyspeed) -- Use iyflyspeed for regular fly
+			local currentSpeed = (vfly and vehicleflyspeed or iyflyspeed)
 
 			if (CONTROL.L + CONTROL.R) ~= 0 or (CONTROL.F + CONTROL.B) ~= 0 or (CONTROL.Q + CONTROL.E) ~= 0 then
-				-- Calculate velocity based on camera and controls
 				local camFrame = workspace.CurrentCamera.CFrame
 				local lookVector = camFrame.lookVector
 				local rightVector = camFrame.rightVector
-				local upVector = camFrame.upVector -- Or Vector3.new(0,1,0) for absolute vertical
+				local upVector = camFrame.upVector
 
 				local moveDir = (lookVector * (CONTROL.F + CONTROL.B)) + (rightVector * (CONTROL.L + CONTROL.R))
-				local verticalDir = Vector3.new(0, (CONTROL.Q + CONTROL.E), 0) -- Use absolute vertical
+				local verticalDir = Vector3.new(0, (CONTROL.Q + CONTROL.E), 0)
 
 				flyBV.velocity = (moveDir + verticalDir) * SPEED * currentSpeed
-				lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R} -- Store last horizontal input
+				lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R}
 
 			elseif (CONTROL.L + CONTROL.R) == 0 and (CONTROL.F + CONTROL.B) == 0 and (CONTROL.Q + CONTROL.E) == 0 and SPEED ~= 0 then
-				-- Apply last horizontal direction if stopping
 				local camFrame = workspace.CurrentCamera.CFrame
 				local lookVector = camFrame.lookVector
 				local rightVector = camFrame.rightVector
 				local moveDir = (lookVector * (lCONTROL.F + lCONTROL.B)) + (rightVector * (lCONTROL.L + lCONTROL.R))
-				flyBV.velocity = moveDir * SPEED * currentSpeed -- Maintain momentum briefly? Or set to zero? Let's set to zero for now.
-				flyBV.velocity = Vector3.new(0,0,0) -- Set to zero when no input
-				SPEED = 0 -- Ensure speed goes to 0
+				flyBV.velocity = moveDir * SPEED * currentSpeed
+				flyBV.velocity = Vector3.new(0,0,0)
+				SPEED = 0
 			else
 				flyBV.velocity = Vector3.new(0, 0, 0)
 			end
-			flyBG.cframe = workspace.CurrentCamera.CFrame -- Align with camera
+			flyBG.cframe = workspace.CurrentCamera.CFrame
 		end)
 
-		-- Wait until fly is stopped
 		while flyLoopActive do wait() end
-		connection:Disconnect() -- Disconnect the Heartbeat loop
+		connection:Disconnect()
 		print("Fly Heartbeat loop stopped.")
 	end)
 
-	-- Handle Keyboard Input
 	if flyKeyDownConnection then flyKeyDownConnection:Disconnect() end
 	flyKeyDownConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed or not FLYING then return end
@@ -516,14 +442,14 @@ local function sFLY(vfly) -- vfly parameter is kept for structure but not used h
 		elseif KEY == 's' then CONTROL.B = -1
 		elseif KEY == 'a' then CONTROL.L = -1
 		elseif KEY == 'd' then CONTROL.R = 1
-		elseif QEfly and KEY == 'e' then CONTROL.Q = 1 -- Up
-		elseif QEfly and KEY == 'q' then CONTROL.E = -1 -- Down
+		elseif QEfly and KEY == 'e' then CONTROL.Q = 1
+		elseif QEfly and KEY == 'q' then CONTROL.E = -1
 		end
 	end)
 
 	if flyKeyUpConnection then flyKeyUpConnection:Disconnect() end
 	flyKeyUpConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-		if not FLYING then return end -- Don't process if not flying (or gameProcessed)
+		if not FLYING then return end
 		local KEY = input.KeyCode.Name:lower()
 		if KEY == 'w' then CONTROL.F = 0
 		elseif KEY == 's' then CONTROL.B = 0
@@ -538,7 +464,7 @@ local function sFLY(vfly) -- vfly parameter is kept for structure but not used h
 end
 
 local function mobilefly()
-	if FLYING then NOFLY() end -- Stop previous fly if any
+	if FLYING then NOFLY() end
 	wait()
 	if not Character or not Humanoid or not HumanoidRootPart then print("Cannot start mobile fly: Character components missing."); return end
 
@@ -548,73 +474,63 @@ local function mobilefly()
 	local v3zero = Vector3.new(0, 0, 0)
 	local v3inf = Vector3.new(9e9, 9e9, 9e9)
 
-	-- Clean up old movers
 	if flyBG and flyBG.Parent then flyBG:Destroy() end
 	if flyBV and flyBV.Parent then flyBV:Destroy() end
 
-	-- Create BodyVelocity
 	flyBV = Instance.new("BodyVelocity")
 	flyBV.Name = "IYMobileFlyBV"
 	flyBV.Parent = T
-	flyBV.MaxForce = v3inf -- Set high force immediately
+	flyBV.MaxForce = v3inf
 	flyBV.Velocity = v3zero
 
-	-- Create BodyGyro
 	flyBG = Instance.new("BodyGyro")
 	flyBG.Name = "IYMobileFlyBG"
 	flyBG.Parent = T
 	flyBG.MaxTorque = v3inf
-	flyBG.P = 10000 -- Adjusted P value
-	flyBG.D = 500  -- Adjusted D value
+	flyBG.P = 10000
+	flyBG.D = 500
 
-	-- Disconnect previous connection if exists
 	if flyRenderStepConnection then flyRenderStepConnection:Disconnect(); flyRenderStepConnection = nil end
 
 	flyRenderStepConnection = RunService.RenderStepped:Connect(function()
 		if not FLYING or not Character or not Humanoid or not T or not T.Parent or not flyBV or not flyBV.Parent or not flyBG or not flyBG.Parent then
 			if flyRenderStepConnection then flyRenderStepConnection:Disconnect(); flyRenderStepConnection = nil end
-			NOFLY() -- Ensure cleanup if fly stops unexpectedly
+			NOFLY()
 			return
 		end
 
 		Humanoid.PlatformStand = true
 		flyBG.CFrame = camera.CFrame
 
-		local direction = Humanoid.MoveDirection -- Use MoveDirection from Humanoid
-		local currentSpeed = iyflyspeed * 50 -- Use base fly speed
+		local direction = Humanoid.MoveDirection
+		local currentSpeed = iyflyspeed * 50
 
-		if direction.Magnitude > 0.1 then -- Check if there's movement input
-			-- Calculate velocity based on camera direction and MoveDirection
+		if direction.Magnitude > 0.1 then
 			local lookVector = camera.CFrame.LookVector
 			local rightVector = camera.CFrame.RightVector
 			local moveDir = (lookVector * -direction.Z) + (rightVector * direction.X)
 			flyBV.Velocity = moveDir.Unit * currentSpeed
 		else
-			flyBV.Velocity = v3zero -- Stop if no movement input
+			flyBV.Velocity = v3zero
 		end
 	end)
 
-	-- Handle character respawn for mobile fly
 	if flyCharacterAddedConnection then flyCharacterAddedConnection:Disconnect(); flyCharacterAddedConnection = nil end
 	flyCharacterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(newChar)
-		-- Re-initialize references for the new character
 		Character = newChar
 		Humanoid = newChar:WaitForChild("Humanoid", 5)
 		HumanoidRootPart = newChar:WaitForChild("HumanoidRootPart", 5)
 		T = HumanoidRootPart
 		if FLYING then
-			-- Re-create movers on the new character parts
-			task.wait(0.5) -- Short delay
+			task.wait(0.5)
 			if T and T.Parent then
 				if flyBG and flyBG.Parent then flyBG:Destroy() end
 				if flyBV and flyBV.Parent then flyBV:Destroy() end
-				-- Re-create BodyVelocity
 				flyBV = Instance.new("BodyVelocity")
 				flyBV.Name = "IYMobileFlyBV"
 				flyBV.Parent = T
 				flyBV.MaxForce = v3inf
 				flyBV.Velocity = v3zero
-				-- Re-create BodyGyro
 				flyBG = Instance.new("BodyGyro")
 				flyBG.Name = "IYMobileFlyBG"
 				flyBG.Parent = T
@@ -624,7 +540,7 @@ local function mobilefly()
 				print("Mobile fly movers re-created on respawn.")
 			else
 				warn("Failed to re-create mobile fly movers on respawn: RootPart not found.")
-				NOFLY() -- Disable fly if character parts aren't ready
+				NOFLY()
 			end
 		end
 	end)
@@ -637,7 +553,6 @@ local function unmobilefly()
 	if flyRenderStepConnection then flyRenderStepConnection:Disconnect(); flyRenderStepConnection = nil end
 	if flyCharacterAddedConnection then flyCharacterAddedConnection:Disconnect(); flyCharacterAddedConnection = nil end
 
-	-- Destroy BodyMovers if they exist
 	local currentRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
 	if currentRootPart then
 		local bv = currentRootPart:FindFirstChild("IYMobileFlyBV")
@@ -654,7 +569,7 @@ end
 
 
 local function toggleFly()
-	FLYING = not FLYING -- Toggle the state first
+	FLYING = not FLYING
 	print("Fly Toggled:", FLYING and "ON" or "OFF")
 	if FLYING then
 		if UserInputService.TouchEnabled then
@@ -673,54 +588,46 @@ local function toggleFly()
 	updateFlyMobileButton()
 end
 
--- NEW: Platform Toggle Logic
 local function createPlatform()
-	-- Check if it already exists and is valid
 	if platformPartRef and platformPartRef.Parent then
         print("Platform already exists.")
-        -- Ensure its position is correct (in case TARGET_POSITION_G changed)
         if platformPartRef.Position ~= TARGET_POSITION_G then
             print("Updating existing platform position.")
             platformPartRef.Position = TARGET_POSITION_G
         end
         return
     end
-    -- If reference exists but part doesn't, clear reference
     if platformPartRef then platformPartRef = nil end
 
 	print("Attempting to create Platform...")
 	platformPartRef = Instance.new("Part")
 	platformPartRef.Name = "FloatingPlatform_Scripted"
 	platformPartRef.Size = PLATFORM_SIZE
-	platformPartRef.Position = TARGET_POSITION_G -- Place it at the platform's target position
+	platformPartRef.Position = TARGET_POSITION_G
 	platformPartRef.Color = PLATFORM_COLOR
 	platformPartRef.Material = Enum.Material.Plastic
 	platformPartRef.Anchored = PLATFORM_ANCHORED
-    -- Set initial visual state based on isPlatformVisible
     platformPartRef.Transparency = isPlatformVisible and PLATFORM_TRANSPARENCY_VISIBLE or PLATFORM_TRANSPARENCY_HIDDEN
 	platformPartRef.CanCollide = isPlatformVisible and PLATFORM_CAN_COLLIDE or false
     platformPartRef.CanTouch = isPlatformVisible
     platformPartRef.CanQuery = isPlatformVisible
-	platformPartRef.Parent = Workspace -- Ensure it's parented correctly
+	platformPartRef.Parent = Workspace
 	print("Platform Created in Workspace at Y:", TARGET_POSITION_G.Y, "Initial State:", isPlatformVisible and "VISIBLE" or "HIDDEN")
 end
 
 local function togglePlatform()
     print("Toggle Platform called. Current state (before toggle):", isPlatformVisible)
-	isPlatformVisible = not isPlatformVisible -- Flip the state
+	isPlatformVisible = not isPlatformVisible
     print("Platform state toggled to:", isPlatformVisible and "VISIBLE" or "HIDDEN")
 
-	-- Ensure the platform exists and is at the correct position
 	if not platformPartRef or not platformPartRef.Parent then
         warn("Platform part reference lost or destroyed. Recreating...")
-		createPlatform() -- Create if it doesn't exist or reference was lost
+		createPlatform()
 	elseif platformPartRef.Position ~= TARGET_POSITION_G then
-        -- If it exists but is in the wrong place (e.g., script reloaded after position change)
         print("Platform exists but position is outdated. Updating position to Y:", TARGET_POSITION_G.Y)
         platformPartRef.Position = TARGET_POSITION_G
     end
 
-	-- Apply properties based on the new state
 	if platformPartRef and platformPartRef.Parent then
         local targetTransparency = isPlatformVisible and PLATFORM_TRANSPARENCY_VISIBLE or PLATFORM_TRANSPARENCY_HIDDEN
         local targetCollide = isPlatformVisible and PLATFORM_CAN_COLLIDE or false
@@ -736,16 +643,10 @@ local function togglePlatform()
         warn("Failed to find or create platform part to update properties.")
     end
 
-	-- Update UI
 	updatePlatformStatusLabel()
 	updatePlatformMobileButton()
 end
 
--- --- UI Creation Functions --- (Remain mostly unchanged)
-
---[[
-    Gets or creates the main ScreenGui for the script's UI elements.
-]]
 local function getOrCreateScreenGui()
 	local screenGui = PlayerGui:FindFirstChild("TeleportControlsScreenGui")
 	if not screenGui then
@@ -753,21 +654,17 @@ local function getOrCreateScreenGui()
 		screenGui.Name = "TeleportControlsScreenGui"
 		screenGui.ResetOnSpawn = false
 		screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		screenGui.DisplayOrder = 10 -- Ensure it's reasonably high
+		screenGui.DisplayOrder = 10
 		screenGui.Parent = PlayerGui
 	end
 	return screenGui
 end
 
---[[
-    Creates or updates the status labels shown in the top-right corner.
-]]
 local function createStatusLabelsUI()
 	local screenGui = getOrCreateScreenGui()
-	-- Clear existing labels to prevent duplicates on respawn/reload
 	local children = screenGui:GetChildren()
 	for _, child in ipairs(children) do
-		if child.Name:match("StatusLabel$") then -- Match names ending with StatusLabel
+		if child.Name:match("StatusLabel$") then
 			child:Destroy()
 		end
 	end
@@ -782,7 +679,7 @@ local function createStatusLabelsUI()
 		local label = Instance.new("TextLabel")
 		label.Name = name
 		label.Size = UDim2.new(0, labelWidth, 0, labelHeight)
-		label.Position = UDim2.new(1, -labelWidth - 10, 0, posY) -- Anchor top-right
+		label.Position = UDim2.new(1, -labelWidth - 10, 0, posY)
 		label.BackgroundTransparency = 0.8
 		label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 		label.BorderSizePixel = 0
@@ -800,16 +697,13 @@ local function createStatusLabelsUI()
 	currentY = currentY + labelHeight + labelSpacing
 	hFuncStatusLabelRef = createBaseStatusLabel("HStatusLabel", currentY); updateHFuncStatusLabel()
 	currentY = currentY + labelHeight + labelSpacing
-	flyStatusLabelRef = createBaseStatusLabel("FlyStatusLabel", currentY); updateFlyStatusLabel() -- NEW
+	flyStatusLabelRef = createBaseStatusLabel("FlyStatusLabel", currentY); updateFlyStatusLabel()
 	currentY = currentY + labelHeight + labelSpacing
-	platformStatusLabelRef = createBaseStatusLabel("PlatformStatusLabel", currentY); updatePlatformStatusLabel() -- NEW
+	platformStatusLabelRef = createBaseStatusLabel("PlatformStatusLabel", currentY); updatePlatformStatusLabel()
 
 	print("Status Labels UI created/updated.")
 end
 
---[[
-    Creates or updates the keybind information label (Desktop only).
-]]
 local function createKeybindsLabelUI()
 	local screenGui = getOrCreateScreenGui()
 	local oldLabel = screenGui:FindFirstChild("KeybindsLabel")
@@ -818,10 +712,9 @@ local function createKeybindsLabelUI()
 	local guiInset = GuiService:GetGuiInset()
 	local topPadding = 5
 	local labelSpacing = 5
-	local labelHeight = 110 -- Increased height for new keybinds
+	local labelHeight = 110
 	local labelWidth = 150
 
-	-- Calculate Y position below the status labels
 	local statusBlockBottomY = topPadding + guiInset.Y
     if platformStatusLabelRef and platformStatusLabelRef.Parent then
 		statusBlockBottomY = platformStatusLabelRef.Position.Y.Offset + platformStatusLabelRef.AbsoluteSize.Y
@@ -840,7 +733,7 @@ local function createKeybindsLabelUI()
 	local keybindsLabel = Instance.new("TextLabel")
 	keybindsLabel.Name = "KeybindsLabel"
 	keybindsLabel.Size = UDim2.new(0, labelWidth, 0, labelHeight)
-	keybindsLabel.Position = UDim2.new(1, -labelWidth - 10, 0, keybindsLabelYOffset) -- Anchor top-right, below status
+	keybindsLabel.Position = UDim2.new(1, -labelWidth - 10, 0, keybindsLabelYOffset)
 	keybindsLabel.BackgroundTransparency = 0.8
 	keybindsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	keybindsLabel.BorderSizePixel = 0
@@ -850,7 +743,6 @@ local function createKeybindsLabelUI()
 	keybindsLabel.TextWrapped = true
 	keybindsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	keybindsLabel.TextYAlignment = Enum.TextYAlignment.Top
-	-- Updated keybind list
 	keybindsLabel.Text = string.format(
         "%s: TP Parts\n%s: TP Troll Part\n%s: TP To Location\n%s: Toggle AntiFall\n%s: Toggle Detect E\n%s: Toggle Detect Q\n%s: Toggle Fly\n%s: Toggle Platform",
         TRIGGER_KEY_Q.Name, TRIGGER_KEY_E.Name, TRIGGER_KEY_R.Name, TRIGGER_KEY_F.Name,
@@ -861,10 +753,6 @@ local function createKeybindsLabelUI()
 	print("Keybinds Info UI created/updated.")
 end
 
-
---[[
-    Creates or updates the mobile control buttons and the draggable toggle button.
-]]
 local function createMobileUI()
 	local screenGui = getOrCreateScreenGui()
 	local oldFrame = screenGui:FindFirstChild("ButtonFrame")
@@ -875,24 +763,20 @@ local function createMobileUI()
 	local guiInset = GuiService:GetGuiInset()
 	local topPadding = 5
 
-	-- Button layout configuration
 	local buttonWidth = 90
 	local buttonHeight = 40
 	local buttonPadding = 5
-	local numButtons = 8 -- Increased number of buttons (Q, E, R, F, G, H, X, P)
+	local numButtons = 8
 
-	-- Calculate frame width based on buttons
 	local frameWidth = (buttonWidth * numButtons) + (buttonPadding * (numButtons - 1))
 
-	-- Main frame for buttons
 	local buttonFrame = Instance.new("Frame")
 	buttonFrame.Name = "ButtonFrame"
 	buttonFrame.BackgroundTransparency = 1
 	buttonFrame.Size = UDim2.new(0, frameWidth, 0, buttonHeight)
-	buttonFrame.Visible = true -- Start visible
+	buttonFrame.Visible = true
 	buttonFrame.Parent = screenGui
 
-	-- Helper function to create a standard mobile button
 	local function createMobileButton(name, text, positionIndex, color, borderColor, clickFunction)
 		local button = Instance.new("TextButton")
 		button.Name = name
@@ -911,25 +795,21 @@ local function createMobileUI()
 		return button
 	end
 
-	-- Create Buttons (Order: Q, E, R, F, G, H, X, P)
 	local buttonQ = createMobileButton("TeleportButtonQ", "Q - Parts", 0, Color3.fromRGB(80, 80, 200), Color3.fromRGB(20, 20, 50), function() handlePartTeleport(TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Button Q") end)
 	local buttonE = createMobileButton("TeleportButtonE", "E - Troll", 1, Color3.fromRGB(200, 80, 80), Color3.fromRGB(50, 20, 20), function() handlePartTeleport(TARGET_PART_NAME_E, TELEPORT_DURATION_E, "Button E") end)
 	local buttonR = createMobileButton("TeleportButtonR", "R - TP Loc", 2, Color3.fromRGB(80, 200, 80), Color3.fromRGB(20, 50, 20), function() teleportPlayerToCoords(TARGET_POSITION_R, "Button R") end)
 
-	-- Toggle Buttons (References are assigned)
 	antiFallButtonRef = createMobileButton("AntiFallButton", "F - AntiFall", 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleAntiFall)
 	gFuncButtonRef = createMobileButton("DetectButtonG", "G - DetectE", 4, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleGFunc)
 	hFuncButtonRef = createMobileButton("DetectButtonH", "H - DetectQ", 5, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleHFunc)
-	flyButtonRef = createMobileButton("FlyButton", "X - Fly", 6, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleFly) -- NEW
-	platformButtonRef = createMobileButton("PlatformButton", "P - Platform", 7, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), togglePlatform) -- NEW
+	flyButtonRef = createMobileButton("FlyButton", "X - Fly", 6, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleFly)
+	platformButtonRef = createMobileButton("PlatformButton", "P - Platform", 7, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), togglePlatform)
 
-	-- Draggable Toggle Button (for showing/hiding the button frame)
 	local toggleButton = Instance.new("TextButton")
 	toggleButton.Name = "ToggleButton"
-	toggleButton.Text = ">" -- Indicates frame is shown
+	toggleButton.Text = ">"
 	toggleButton.Size = UDim2.new(0, 30, 0, buttonHeight)
 
-	-- Position toggle button below status labels (if they exist)
 	local lowestLabelY = topPadding + guiInset.Y
 	if platformStatusLabelRef and platformStatusLabelRef.Parent then
 		lowestLabelY = platformStatusLabelRef.Position.Y.Offset + platformStatusLabelRef.AbsoluteSize.Y
@@ -944,35 +824,31 @@ local function createMobileUI()
 	end
 	local toggleYOffset = lowestLabelY + 10
 
-	toggleButton.Position = UDim2.new(1, -45, 0, toggleYOffset) -- Position near top-right, below labels
+	toggleButton.Position = UDim2.new(1, -45, 0, toggleYOffset)
 	toggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 	toggleButton.BorderColor3 = Color3.fromRGB(50, 50, 50)
 	toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	toggleButton.Font = Enum.Font.SourceSansBold
 	toggleButton.TextSize = 24
-	toggleButton.AutoButtonColor = false -- Prevent default color changes on click
+	toggleButton.AutoButtonColor = false
 	toggleButton.Parent = screenGui
 	uiToggleButtonRef = toggleButton
 
-	-- Function to position the button frame relative to the toggle button
 	local function updateFramePosition()
-        -- Ensure frame size is calculated correctly before positioning
-        task.wait() -- Short delay to allow AbsoluteSize to update if needed
+        task.wait()
 		buttonFrame.Position = UDim2.new(
-			toggleButton.Position.X.Scale, toggleButton.Position.X.Offset - buttonFrame.AbsoluteSize.X - 10, -- Position left of toggle button
-			toggleButton.Position.Y.Scale, toggleButton.Position.Y.Offset -- Align vertically
+			toggleButton.Position.X.Scale, toggleButton.Position.X.Offset - buttonFrame.AbsoluteSize.X - 10,
+			toggleButton.Position.Y.Scale, toggleButton.Position.Y.Offset
 		)
 	end
 
-	-- Initial setup
 	updateFramePosition()
 	updateAntiFallMobileButton()
 	updateGFuncMobileButton()
 	updateHFuncMobileButton()
-	updateFlyMobileButton() -- NEW
-	updatePlatformMobileButton() -- NEW
+	updateFlyMobileButton()
+	updatePlatformMobileButton()
 
-	-- Dragging and Toggle Logic for the UI Toggle Button
 	local dragging = false
 	local dragInput = nil
 	local dragStart = nil
@@ -983,44 +859,36 @@ local function createMobileUI()
 			dragging = true
 			dragStart = input.Position
 			startPos = toggleButton.Position
-			dragInput = input -- Store the specific input object
+			dragInput = input
 
-			-- Handle click vs drag end
 			local connection
 			connection = input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
-					-- If it was a short drag (likely a click), toggle visibility
 					if dragging and (input.Position - dragStart).Magnitude < 5 then
 						buttonFrame.Visible = not buttonFrame.Visible
-						toggleButton.Text = buttonFrame.Visible and ">" or "<" -- Update arrow direction
+						toggleButton.Text = buttonFrame.Visible and ">" or "<"
 						if buttonFrame.Visible then
-							updateFramePosition() -- Reposition frame if it became visible
+							updateFramePosition()
 						end
 					end
-					-- End dragging state regardless
 					dragging = false
 					dragInput = nil
-					if connection then connection:Disconnect() end -- Clean up listener
+					if connection then connection:Disconnect() end
 				end
 			end)
 		end
 	end)
 
 	toggleButton.InputChanged:Connect(function(input)
-		-- If this is the input we started dragging with and it's a movement
 		if input == dragInput and dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			-- Only start dragging visually after a small threshold to distinguish from clicks
 			if (input.Position - dragStart).Magnitude >= 5 then
 				local delta = input.Position - dragStart
-				-- Update toggle button position based on drag delta
 				toggleButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-				-- Update button frame position relative to the toggle button
 				updateFramePosition()
 			end
 		end
 	end)
 
-	-- Ensure dragging stops if input ends unexpectedly
 	UserInputService.InputEnded:Connect(function(input)
 		if input == dragInput and dragging then
 			dragging = false
@@ -1031,83 +899,69 @@ local function createMobileUI()
 	print("Mobile controls UI created/updated.")
 end
 
-
---[[
-    Hides parts named TARGET_PART_NAME_Q initially.
-    Note: This might be undesirable if these parts should normally be visible.
-]]
 local function hideInitialParts()
 	print("Hiding initial Q parts...")
 	local partsHidden = 0
 	for _, descendant in ipairs(Workspace:GetDescendants()) do
 		if descendant:IsA("BasePart") and descendant.Name == TARGET_PART_NAME_Q then
-			setVisibilityRecursive(descendant, false, {}) -- Use empty state store as we don't need to restore
+			setVisibilityRecursive(descendant, false, {})
 			partsHidden = partsHidden + 1
 		end
 	end
 	print("Finished hiding initial Q parts. Count:", partsHidden)
 end
 
---[[
-    Creates visual spheres in the Workspace to show the detection radii for G and H functions.
-    Also updates the G visualizer position if TARGET_POSITION_G changes.
-]]
 local function createDetectionVisualizers()
-	-- G Visualizer (Uses DETECT_POSITION_G for location)
 	if not gVisualizerPartRef or not gVisualizerPartRef.Parent then
-        if gVisualizerPartRef then gVisualizerPartRef:Destroy() end -- Clean up old ref if parentless
+        if gVisualizerPartRef then gVisualizerPartRef:Destroy() end
 		local sphereG = Instance.new("Part")
 		sphereG.Name = "G_DetectionZoneVisualizer"
 		sphereG.Shape = Enum.PartType.Ball
 		sphereG.Size = Vector3.new(DETECTION_RADIUS_G*2, DETECTION_RADIUS_G*2, DETECTION_RADIUS_G*2)
-		sphereG.Position = DETECT_POSITION_G -- *** Use the separate detection position ***
-		sphereG.Color = Color3.fromRGB(0, 255, 255) -- Cyan
+		sphereG.Position = DETECT_POSITION_G
+		sphereG.Color = Color3.fromRGB(0, 255, 255)
 		sphereG.Material = Enum.Material.ForceField
 		sphereG.Transparency = 0.7
 		sphereG.Anchored = true
 		sphereG.CanCollide = false
 		sphereG.CanTouch = false
 		sphereG.CanQuery = false
-		sphereG.Visible = isGFuncEnabled -- Initial visibility
+		sphereG.Visible = isGFuncEnabled
 		sphereG.Parent = Workspace
 		gVisualizerPartRef = sphereG
 		print("G Detection Visualizer Created at Y:", DETECT_POSITION_G.Y)
     elseif gVisualizerPartRef.Position ~= DETECT_POSITION_G then
-         -- If it exists but position is outdated (due to DETECT_POSITION_G change)
         print("Updating G Visualizer position to Y:", DETECT_POSITION_G.Y)
         gVisualizerPartRef.Position = DETECT_POSITION_G
 	end
-	-- H Visualizer
 	if not hVisualizerPartRef or not hVisualizerPartRef.Parent then
-        if hVisualizerPartRef then hVisualizerPartRef:Destroy() end -- Clean up old ref if parentless
+        if hVisualizerPartRef then hVisualizerPartRef:Destroy() end
 		local sphereH = Instance.new("Part")
 		sphereH.Name = "H_DetectionZoneVisualizer"
 		sphereH.Shape = Enum.PartType.Ball
 		sphereH.Size = Vector3.new(DETECTION_RADIUS_H*2, DETECTION_RADIUS_H*2, DETECTION_RADIUS_H*2)
 		sphereH.Position = TARGET_POSITION_H
-		sphereH.Color = Color3.fromRGB(255, 255, 0) -- Yellow
+		sphereH.Color = Color3.fromRGB(255, 255, 0)
 		sphereH.Material = Enum.Material.ForceField
 		sphereH.Transparency = 0.7
 		sphereH.Anchored = true
 		sphereH.CanCollide = false
 		sphereH.CanTouch = false
 		sphereH.CanQuery = false
-		sphereH.Visible = isHFuncEnabled -- Initial visibility
+		sphereH.Visible = isHFuncEnabled
 		sphereH.Parent = Workspace
 		hVisualizerPartRef = sphereH
 		print("H Detection Visualizer Created.")
 	end
 
-	-- Cleanup visualizers and platform when character is removed
 	LocalPlayer.CharacterRemoving:Connect(function(removedCharacter)
         print("CharacterRemoving event fired.")
 		if gVisualizerPartRef and gVisualizerPartRef.Parent then gVisualizerPartRef:Destroy() end
         gVisualizerPartRef = nil
 		if hVisualizerPartRef and hVisualizerPartRef.Parent then hVisualizerPartRef:Destroy() end
         hVisualizerPartRef = nil
-		if platformPartRef and platformPartRef.Parent then platformPartRef:Destroy() end -- Cleanup platform
+		if platformPartRef and platformPartRef.Parent then platformPartRef:Destroy() end
         platformPartRef = nil
-        -- Stop fly if active
         if FLYING then
             if UserInputService.TouchEnabled then unmobilefly() else NOFLY() end
         end
@@ -1115,14 +969,7 @@ local function createDetectionVisualizers()
 	end)
 end
 
--- --- Game Loops ---
-
---[[
-    RenderStepped loop for continuous checks like Anti-Fall.
-    Fly movement is now handled within its own functions (sFLY/mobilefly).
-]]
 RunService.RenderStepped:Connect(function(deltaTime)
-	-- Anti-Fall Check
 	if isAntiFallEnabled then
 		local currentTime = tick()
 		if currentTime - lastAntiFallTime >= ANTI_FALL_COOLDOWN then
@@ -1140,79 +987,42 @@ RunService.RenderStepped:Connect(function(deltaTime)
 			end
 		end
 	end
-
-	-- Fly Movement Logic is now handled by sFLY/mobilefly internal loops/connections
 end)
 
---[[
-    Loop to detect nearby players for the G -> E function.
-    Uses DETECT_POSITION_G for location check.
-]]
 local function detectNearbyPlayersAndTriggerE_Loop()
-	while task.wait(0.1) do -- Use task.wait at the start for better practice
-        -- DEBUG: Print loop status
-        -- print("DEBUG: Detect E Loop iteration. isGFuncEnabled =", isGFuncEnabled, "isPartTeleporting =", isPartTeleporting)
-
+	while task.wait(0.1) do
 		if isGFuncEnabled and not isPartTeleporting then
-            -- DEBUG: Print check passed
-            -- print("DEBUG: Detect E Loop check passed. Current Time:", tick())
-
 			local currentTime = tick()
 			if currentTime - lastPlayerDetectTime_G >= PLAYER_DETECT_COOLDOWN_G then
-                -- DEBUG: Print cooldown passed
-                -- print("DEBUG: Detect E Cooldown passed.")
-
 				local localPlayer = LocalPlayer
 				local localChar = localPlayer.Character
-				if not localChar then
-                    -- DEBUG: Print no local character
-                    -- print("DEBUG: No local character found in Detect E loop.")
-                    continue -- Skip iteration if character doesn't exist
-                end
+				if not localChar then continue end
 
 				local foundTarget = false
 				for _, player in ipairs(Players:GetPlayers()) do
-					if player ~= localPlayer then -- Don't detect self
-                        -- DEBUG: Print checking player
-                        -- print("DEBUG: Checking player:", player.Name)
-
+					if player ~= localPlayer then
 						local character = player.Character
 						if character then
 							local hrp = character:FindFirstChild("HumanoidRootPart")
 							if hrp then
-                                -- *** Use the separate detection position ***
 								local distance = (hrp.Position - DETECT_POSITION_G).Magnitude
-                                -- DEBUG: Print distance
-                                -- print("DEBUG: Distance to", player.Name, "=", string.format("%.2f", distance), "vs Radius", DETECTION_RADIUS_G)
-
 								if distance <= DETECTION_RADIUS_G then
-                                    -- DEBUG: Print detection!
 									print("DEBUG: Player '"..player.Name.."' detected near G (Dist: "..string.format("%.2f", distance).."). Triggering E.")
-									-- Use task.spawn to avoid potential yield issues if handlePartTeleport takes time
 									task.spawn(handlePartTeleport, TARGET_PART_NAME_E, TELEPORT_DURATION_E, "G Detection")
 									lastPlayerDetectTime_G = currentTime
 									foundTarget = true
-									break -- Trigger only once per check cycle
+									break
 								end
-							-- else -- DEBUG
-                                -- print("DEBUG: No HRP found for player:", player.Name)
                             end
-						-- else -- DEBUG
-                            -- print("DEBUG: No character found for player:", player.Name)
                         end
 					end
 				end
-			-- else -- DEBUG
-                -- print("DEBUG: Detect E Cooldown NOT passed. Time since last:", currentTime - lastPlayerDetectTime_G)
             end
 		end
 	end
 end
 
---[[
-    Loop to detect nearby players for the H -> Q function.
-]]
-local function detectNearbyPlayersAndTriggerQ_Loop() -- Renamed from X to Q
+local function detectNearbyPlayersAndTriggerQ_Loop()
 	while task.wait(0.1) do
 		if isHFuncEnabled and not isPartTeleporting then
 			local currentTime = tick()
@@ -1230,8 +1040,8 @@ local function detectNearbyPlayersAndTriggerQ_Loop() -- Renamed from X to Q
 							if hrp then
 								local distance = (hrp.Position - TARGET_POSITION_H).Magnitude
 								if distance <= DETECTION_RADIUS_H then
-									print("Player '"..player.Name.."' detected near H (Dist: "..string.format("%.2f", distance).."). Triggering Q.") -- Updated X to Q
-									task.spawn(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "H Detection") -- Updated X to Q
+									print("Player '"..player.Name.."' detected near H (Dist: "..string.format("%.2f", distance).."). Triggering Q.")
+									task.spawn(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "H Detection")
 									lastPlayerDetectTime_H = currentTime
 									foundTarget = true
 									break
@@ -1245,23 +1055,17 @@ local function detectNearbyPlayersAndTriggerQ_Loop() -- Renamed from X to Q
 	end
 end
 
--- --- Initialization ---
-
--- Optionally hide initial parts (consider if this is needed)
--- pcall(hideInitialParts)
-
--- Create UI Elements and Initial World Objects
 local uiSuccess, uiError = pcall(function()
     print("Initializing UI and World Objects...")
 	createStatusLabelsUI()
-	if not UserInputService.TouchEnabled then -- Desktop only UI
+	if not UserInputService.TouchEnabled then
 		createKeybindsLabelUI()
 	end
-	if UserInputService.TouchEnabled then -- Mobile only UI
+	if UserInputService.TouchEnabled then
 		createMobileUI()
 	end
 	createDetectionVisualizers()
-    createPlatform() -- Create platform initially (will be hidden/shown by toggle based on default isPlatformVisible = false)
+    createPlatform()
     print("Initialization complete.")
 end)
 
@@ -1269,25 +1073,20 @@ if not uiSuccess then
 	warn("Error during UI/World Initialization:", uiError)
 end
 
--- Start Detection Loops in separate threads
 task.spawn(detectNearbyPlayersAndTriggerE_Loop)
-task.spawn(detectNearbyPlayersAndTriggerQ_Loop) -- Renamed from X to Q
+task.spawn(detectNearbyPlayersAndTriggerQ_Loop)
 print("Detection loops started.")
 
--- Connect Input Handling
 local inputSuccess, inputError = pcall(function()
-    -- Disconnect previous fly listeners if they exist (safety check)
     if flyKeyDownConnection then flyKeyDownConnection:Disconnect(); flyKeyDownConnection = nil end
     if flyKeyUpConnection then flyKeyUpConnection:Disconnect(); flyKeyUpConnection = nil end
 
 	UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-		-- Ignore input if it's already processed by the game (e.g., typing in chat)
-        -- Also ignore if fly is handling the input (except for the fly toggle key itself)
 		if gameProcessedEvent or (FLYING and input.KeyCode ~= TRIGGER_KEY_FLY) then return end
 
 		local keyCode = input.KeyCode
 
-		if keyCode == TRIGGER_KEY_Q then -- Changed from X
+		if keyCode == TRIGGER_KEY_Q then
             print("Q Key Pressed")
 			pcall(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Q Key")
 		elseif keyCode == TRIGGER_KEY_E then
@@ -1305,28 +1104,24 @@ local inputSuccess, inputError = pcall(function()
 		elseif keyCode == TRIGGER_KEY_H then
             print("H Key Pressed")
 			pcall(toggleHFunc)
-		elseif keyCode == TRIGGER_KEY_FLY then -- NEW Fly Toggle
+		elseif keyCode == TRIGGER_KEY_FLY then
             print("X Key Pressed")
             pcall(toggleFly)
-        elseif keyCode == TRIGGER_KEY_PLATFORM then -- NEW Platform Toggle
+        elseif keyCode == TRIGGER_KEY_PLATFORM then
             print("P Key Pressed")
             pcall(togglePlatform)
 		end
 	end)
-
-    -- Note: Fly key up events are handled within the sFLY function's listener setup
 end)
 
 if not inputSuccess then
 	warn("Error connecting Input Handler:", inputError)
 else
-	print("Teleporting, Anti-Fall, Player Detect, Fly & Platform script input handler loaded. Keys: Q, E, R, F, G, H, X, P.") -- Updated key list
+	print("Teleporting, Anti-Fall, Player Detect, Fly & Platform script input handler loaded. Keys: Q, E, R, F, G, H, X, P.")
 end
 
--- Refresh character variables and recreate objects on respawn
 LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     print("CharacterAdded event fired. Updating references and recreating objects.")
-    -- Wait briefly for character components to load fully
     task.wait(0.2)
     Character = newCharacter
     local success
@@ -1337,22 +1132,17 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
 
     print("Character references updated.")
 
-    -- Re-apply fly state if it was active
     if FLYING then
         print("Re-applying fly state after respawn.")
-        -- Need a small delay for physics objects to be ready after respawn
         task.wait(0.5)
-        -- Re-call the appropriate fly function
         if UserInputService.TouchEnabled then
             mobilefly()
         else
             sFLY()
         end
     end
-    -- Recreate visualizers and platform if they were destroyed (or ensure they exist and are positioned correctly)
     createDetectionVisualizers()
-    createPlatform() -- This will recreate/reposition if needed
-    -- Recreate UI elements to ensure they are present and updated
+    createPlatform()
     createStatusLabelsUI()
     if not UserInputService.TouchEnabled then createKeybindsLabelUI() end
     if UserInputService.TouchEnabled then createMobileUI() end
