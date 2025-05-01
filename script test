@@ -763,26 +763,30 @@ local function createMobileUI()
 	local guiInset = GuiService:GetGuiInset()
 	local topPadding = 5
 
-	local buttonWidth = 90
-	local buttonHeight = 40
+	local buttonWidth = 80
+	local buttonHeight = 35
 	local buttonPadding = 5
-	local numButtons = 8
+	local buttonsPerRow = 4
+	local numRows = 2
 
-	local frameWidth = (buttonWidth * numButtons) + (buttonPadding * (numButtons - 1))
+	local frameWidth = (buttonWidth * buttonsPerRow) + (buttonPadding * (buttonsPerRow - 1))
+	local frameHeight = (buttonHeight * numRows) + (buttonPadding * (numRows - 1))
 
 	local buttonFrame = Instance.new("Frame")
 	buttonFrame.Name = "ButtonFrame"
 	buttonFrame.BackgroundTransparency = 1
-	buttonFrame.Size = UDim2.new(0, frameWidth, 0, buttonHeight)
+	buttonFrame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
 	buttonFrame.Visible = true
 	buttonFrame.Parent = screenGui
 
-	local function createMobileButton(name, text, positionIndex, color, borderColor, clickFunction)
+	local function createMobileButton(name, text, rowIndex, colIndex, color, borderColor, clickFunction)
 		local button = Instance.new("TextButton")
 		button.Name = name
 		button.Text = text
 		button.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
-		button.Position = UDim2.new(0, (buttonWidth + buttonPadding) * positionIndex, 0, 0)
+		local posX = (buttonWidth + buttonPadding) * colIndex
+		local posY = (buttonHeight + buttonPadding) * rowIndex
+		button.Position = UDim2.new(0, posX, 0, posY)
 		button.BackgroundColor3 = color
 		button.BorderColor3 = borderColor
 		button.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -795,15 +799,15 @@ local function createMobileUI()
 		return button
 	end
 
-	local buttonQ = createMobileButton("TeleportButtonQ", "Q - Parts", 0, Color3.fromRGB(80, 80, 200), Color3.fromRGB(20, 20, 50), function() handlePartTeleport(TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Button Q") end)
-	local buttonE = createMobileButton("TeleportButtonE", "E - Troll", 1, Color3.fromRGB(200, 80, 80), Color3.fromRGB(50, 20, 20), function() handlePartTeleport(TARGET_PART_NAME_E, TELEPORT_DURATION_E, "Button E") end)
-	local buttonR = createMobileButton("TeleportButtonR", "R - TP Loc", 2, Color3.fromRGB(80, 200, 80), Color3.fromRGB(20, 50, 20), function() teleportPlayerToCoords(TARGET_POSITION_R, "Button R") end)
+	local buttonQ = createMobileButton("TeleportButtonQ", "Q-Parts", 0, 0, Color3.fromRGB(80, 80, 200), Color3.fromRGB(20, 20, 50), function() handlePartTeleport(TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Button Q") end)
+	local buttonE = createMobileButton("TeleportButtonE", "E-Troll", 0, 1, Color3.fromRGB(200, 80, 80), Color3.fromRGB(50, 20, 20), function() handlePartTeleport(TARGET_PART_NAME_E, TELEPORT_DURATION_E, "Button E") end)
+	local buttonR = createMobileButton("TeleportButtonR", "R-TP Loc", 0, 2, Color3.fromRGB(80, 200, 80), Color3.fromRGB(20, 50, 20), function() teleportPlayerToCoords(TARGET_POSITION_R, "Button R") end)
+	antiFallButtonRef = createMobileButton("AntiFallButton", "F-AntiFall", 0, 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleAntiFall)
 
-	antiFallButtonRef = createMobileButton("AntiFallButton", "F - AntiFall", 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleAntiFall)
-	gFuncButtonRef = createMobileButton("DetectButtonG", "G - DetectE", 4, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleGFunc)
-	hFuncButtonRef = createMobileButton("DetectButtonH", "H - DetectQ", 5, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleHFunc)
-	flyButtonRef = createMobileButton("FlyButton", "X - Fly", 6, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleFly)
-	platformButtonRef = createMobileButton("PlatformButton", "P - Platform", 7, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), togglePlatform)
+	gFuncButtonRef = createMobileButton("DetectButtonG", "G-DetectE", 1, 0, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleGFunc)
+	hFuncButtonRef = createMobileButton("DetectButtonH", "H-DetectQ", 1, 1, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleHFunc)
+	flyButtonRef = createMobileButton("FlyButton", "X-Fly", 1, 2, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleFly)
+	platformButtonRef = createMobileButton("PlatformButton", "P-Platform", 1, 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), togglePlatform)
 
 	local toggleButton = Instance.new("TextButton")
 	toggleButton.Name = "ToggleButton"
