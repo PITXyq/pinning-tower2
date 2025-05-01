@@ -1,16 +1,20 @@
+-- Services
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService") -- Needed for Rayfield check
 
+-- Player specific variables
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
+-- Configuration Variables
 local TARGET_PART_NAME_Q = "사라지는 파트"
 local TELEPORT_DURATION_Q = 0.1
 local TRIGGER_KEY_Q = Enum.KeyCode.Q
@@ -57,6 +61,7 @@ local PLATFORM_CAN_COLLIDE = true
 local isPlatformVisible = false
 local platformPartRef = nil
 
+-- State Variables
 local isPartTeleporting = false
 local originalStateData = {}
 local isAntiFallEnabled = false
@@ -66,20 +71,31 @@ local lastPlayerDetectTime_G = 0
 local isHFuncEnabled = false
 local lastPlayerDetectTime_H = 0
 
-local antiFallButtonRef = nil
-local gFuncButtonRef = nil
-local hFuncButtonRef = nil
-local flyButtonRef = nil
-local platformButtonRef = nil
-local uiToggleButtonRef = nil
-local antiFallStatusLabelRef = nil
-local gFuncStatusLabelRef = nil
-local hFuncStatusLabelRef = nil
-local flyStatusLabelRef = nil
-local platformStatusLabelRef = nil
-local keybindsLabelRef = nil
-local gVisualizerPartRef = nil
-local hVisualizerPartRef = nil
+-- Rayfield UI References (Optional, for potential external updates)
+local antiFallToggleRef = nil
+local gFuncToggleRef = nil
+local hFuncToggleRef = nil
+local flyToggleRef = nil
+local platformToggleRef = nil
+
+-- Rayfield Library Loading
+local Rayfield = nil
+local success, errorMsg = pcall(function()
+    Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+
+if not success or not Rayfield then
+    warn("Failed to load Rayfield library:", errorMsg)
+    -- Optionally notify the user or fallback to a simpler UI if needed
+    LocalPlayer:Kick("Failed to load required UI library. Please ensure you have internet access.")
+    return
+end
+
+-- Utility Functions (Keep necessary ones)
+local function getRoot(char)
+	local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
+	return rootPart
+end
 
 local function setVisibilityRecursive(instance, visible, stateStore)
 	if not instance then return end
@@ -193,150 +209,27 @@ local function teleportPlayerToCoords(targetPosition, triggerSource)
 	currentHumanoidRootPart.CFrame = CFrame.new(targetPosition)
 end
 
-local function updateAntiFallStatusLabel()
-	if antiFallStatusLabelRef then
-		if isAntiFallEnabled then
-			antiFallStatusLabelRef.Text = "Anti-Fall: Enabled"
-			antiFallStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
-		else
-			antiFallStatusLabelRef.Text = "Anti-Fall: Disabled"
-			antiFallStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
-		end
-	end
-end
-local function updateGFuncStatusLabel()
-	if gFuncStatusLabelRef then
-		if isGFuncEnabled then
-			gFuncStatusLabelRef.Text = "Detect E: Enabled"
-			gFuncStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
-		else
-			gFuncStatusLabelRef.Text = "Detect E: Disabled"
-			gFuncStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
-		end
-	end
-end
-local function updateHFuncStatusLabel()
-	if hFuncStatusLabelRef then
-		if isHFuncEnabled then
-			hFuncStatusLabelRef.Text = "Detect Q: Enabled"
-			hFuncStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
-		else
-			hFuncStatusLabelRef.Text = "Detect Q: Disabled"
-			hFuncStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
-		end
-	end
-end
-local function updateFlyStatusLabel()
-	if flyStatusLabelRef then
-		if FLYING then
-			flyStatusLabelRef.Text = "Fly: Enabled"
-			flyStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
-		else
-			flyStatusLabelRef.Text = "Fly: Disabled"
-			flyStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
-		end
-	end
-end
-local function updatePlatformStatusLabel()
-	if platformStatusLabelRef then
-		if isPlatformVisible then
-			platformStatusLabelRef.Text = "Platform: Enabled"
-			platformStatusLabelRef.TextColor3 = Color3.fromRGB(0, 255, 0)
-		else
-			platformStatusLabelRef.Text = "Platform: Disabled"
-			platformStatusLabelRef.TextColor3 = Color3.fromRGB(255, 0, 0)
-		end
-	end
-end
-
-local function updateAntiFallMobileButton()
-	if antiFallButtonRef then
-		if isAntiFallEnabled then
-			antiFallButtonRef.Text = "F: AntiFall ON"
-			antiFallButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-			antiFallButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
-		else
-			antiFallButtonRef.Text = "F: AntiFall OFF"
-			antiFallButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-			antiFallButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
-		end
-	end
-end
-local function updateGFuncMobileButton()
-	if gFuncButtonRef then
-		if isGFuncEnabled then
-			gFuncButtonRef.Text = "G: Detect E ON"
-			gFuncButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-			gFuncButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
-		else
-			gFuncButtonRef.Text = "G: Detect E OFF"
-			gFuncButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-			gFuncButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
-		end
-	end
-end
-local function updateHFuncMobileButton()
-	if hFuncButtonRef then
-		if isHFuncEnabled then
-			hFuncButtonRef.Text = "H: Detect Q ON"
-			hFuncButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-			hFuncButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
-		else
-			hFuncButtonRef.Text = "H: Detect Q OFF"
-			hFuncButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-			hFuncButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
-		end
-	end
-end
-local function updateFlyMobileButton()
-	if flyButtonRef then
-		if FLYING then
-			flyButtonRef.Text = "X: Fly ON"
-			flyButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-			flyButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
-		else
-			flyButtonRef.Text = "X: Fly OFF"
-			flyButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-			flyButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
-		end
-	end
-end
-local function updatePlatformMobileButton()
-	if platformButtonRef then
-		if isPlatformVisible then
-			platformButtonRef.Text = "P: Platform ON"
-			platformButtonRef.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-			platformButtonRef.TextColor3 = Color3.fromRGB(255, 255, 255)
-		else
-			platformButtonRef.Text = "P: Platform OFF"
-			platformButtonRef.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-			platformButtonRef.TextColor3 = Color3.fromRGB(220, 220, 220)
-		end
-	end
-end
-
+-- Toggle Functions (Modified for Rayfield potentially)
 local function toggleAntiFall()
 	isAntiFallEnabled = not isAntiFallEnabled
 	print("Anti-Fall Toggled:", isAntiFallEnabled and "ON" or "OFF")
-	updateAntiFallStatusLabel()
-	updateAntiFallMobileButton()
+	-- Rayfield toggle might update automatically, if not, update here:
+	-- if antiFallToggleRef then antiFallToggleRef:Set(isAntiFallEnabled) end
 end
 local function toggleGFunc()
 	isGFuncEnabled = not isGFuncEnabled
 	print("Player Detection (G -> E) Toggled:", isGFuncEnabled and "ON" or "OFF")
-	updateGFuncStatusLabel()
-	updateGFuncMobileButton()
 	if gVisualizerPartRef then gVisualizerPartRef.Visible = isGFuncEnabled end
-    print("DEBUG: isGFuncEnabled set to:", isGFuncEnabled)
+	-- if gFuncToggleRef then gFuncToggleRef:Set(isGFuncEnabled) end
 end
 local function toggleHFunc()
 	isHFuncEnabled = not isHFuncEnabled
 	print("Player Detection (H -> Q) Toggled:", isHFuncEnabled and "ON" or "OFF")
-	updateHFuncStatusLabel()
-	updateHFuncMobileButton()
 	if hVisualizerPartRef then hVisualizerPartRef.Visible = isHFuncEnabled end
+	-- if hFuncToggleRef then hFuncToggleRef:Set(isHFuncEnabled) end
 end
 
+-- Fly Logic (IY Style)
 local CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
 local lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
 local SPEED = 0
@@ -567,7 +460,6 @@ local function unmobilefly()
 	print("IY Mobile Fly Disabled")
 end
 
-
 local function toggleFly()
 	FLYING = not FLYING
 	print("Fly Toggled:", FLYING and "ON" or "OFF")
@@ -584,10 +476,11 @@ local function toggleFly()
 			NOFLY()
 		end
 	end
-	updateFlyStatusLabel()
-	updateFlyMobileButton()
+	-- Rayfield toggle might update automatically, if not, update here:
+	-- if flyToggleRef then flyToggleRef:Set(FLYING) end
 end
 
+-- Platform Logic
 local function createPlatform()
 	if platformPartRef and platformPartRef.Parent then
         print("Platform already exists.")
@@ -642,280 +535,13 @@ local function togglePlatform()
 	else
         warn("Failed to find or create platform part to update properties.")
     end
-
-	updatePlatformStatusLabel()
-	updatePlatformMobileButton()
+	-- Rayfield toggle might update automatically, if not, update here:
+    -- if platformToggleRef then platformToggleRef:Set(isPlatformVisible) end
 end
 
-local function getOrCreateScreenGui()
-	local screenGui = PlayerGui:FindFirstChild("TeleportControlsScreenGui")
-	if not screenGui then
-		screenGui = Instance.new("ScreenGui")
-		screenGui.Name = "TeleportControlsScreenGui"
-		screenGui.ResetOnSpawn = false
-		screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		screenGui.DisplayOrder = 10
-		screenGui.Parent = PlayerGui
-	end
-	return screenGui
-end
-
-local function createStatusLabelsUI()
-	local screenGui = getOrCreateScreenGui()
-	local children = screenGui:GetChildren()
-	for _, child in ipairs(children) do
-		if child.Name:match("StatusLabel$") then
-			child:Destroy()
-		end
-	end
-
-	local guiInset = GuiService:GetGuiInset()
-	local topPadding = 5
-	local labelHeight = 20
-	local labelWidth = 150
-	local labelSpacing = 5
-
-	local function createBaseStatusLabel(name, posY)
-		local label = Instance.new("TextLabel")
-		label.Name = name
-		label.Size = UDim2.new(0, labelWidth, 0, labelHeight)
-		label.Position = UDim2.new(1, -labelWidth - 10, 0, posY)
-		label.BackgroundTransparency = 0.8
-		label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		label.BorderSizePixel = 0
-		label.Font = Enum.Font.SourceSansBold
-		label.TextSize = 14
-		label.TextXAlignment = Enum.TextXAlignment.Center
-		label.Parent = screenGui
-		return label
-	end
-
-	local currentY = topPadding + guiInset.Y
-	antiFallStatusLabelRef = createBaseStatusLabel("AntiFallStatusLabel", currentY); updateAntiFallStatusLabel()
-	currentY = currentY + labelHeight + labelSpacing
-	gFuncStatusLabelRef = createBaseStatusLabel("GStatusLabel", currentY); updateGFuncStatusLabel()
-	currentY = currentY + labelHeight + labelSpacing
-	hFuncStatusLabelRef = createBaseStatusLabel("HStatusLabel", currentY); updateHFuncStatusLabel()
-	currentY = currentY + labelHeight + labelSpacing
-	flyStatusLabelRef = createBaseStatusLabel("FlyStatusLabel", currentY); updateFlyStatusLabel()
-	currentY = currentY + labelHeight + labelSpacing
-	platformStatusLabelRef = createBaseStatusLabel("PlatformStatusLabel", currentY); updatePlatformStatusLabel()
-
-	print("Status Labels UI created/updated.")
-end
-
-local function createKeybindsLabelUI()
-	local screenGui = getOrCreateScreenGui()
-	local oldLabel = screenGui:FindFirstChild("KeybindsLabel")
-	if oldLabel then oldLabel:Destroy() end
-
-	local guiInset = GuiService:GetGuiInset()
-	local topPadding = 5
-	local labelSpacing = 5
-	local labelHeight = 110
-	local labelWidth = 150
-
-	local statusBlockBottomY = topPadding + guiInset.Y
-    if platformStatusLabelRef and platformStatusLabelRef.Parent then
-		statusBlockBottomY = platformStatusLabelRef.Position.Y.Offset + platformStatusLabelRef.AbsoluteSize.Y
-	elseif flyStatusLabelRef and flyStatusLabelRef.Parent then
-        statusBlockBottomY = flyStatusLabelRef.Position.Y.Offset + flyStatusLabelRef.AbsoluteSize.Y
-    elseif hFuncStatusLabelRef and hFuncStatusLabelRef.Parent then
-		statusBlockBottomY = hFuncStatusLabelRef.Position.Y.Offset + hFuncStatusLabelRef.AbsoluteSize.Y
-	elseif gFuncStatusLabelRef and gFuncStatusLabelRef.Parent then
-		statusBlockBottomY = gFuncStatusLabelRef.Position.Y.Offset + gFuncStatusLabelRef.AbsoluteSize.Y
-	elseif antiFallStatusLabelRef and antiFallStatusLabelRef.Parent then
-		statusBlockBottomY = antiFallStatusLabelRef.Position.Y.Offset + antiFallStatusLabelRef.AbsoluteSize.Y
-	end
-
-	local keybindsLabelYOffset = statusBlockBottomY + 10
-
-	local keybindsLabel = Instance.new("TextLabel")
-	keybindsLabel.Name = "KeybindsLabel"
-	keybindsLabel.Size = UDim2.new(0, labelWidth, 0, labelHeight)
-	keybindsLabel.Position = UDim2.new(1, -labelWidth - 10, 0, keybindsLabelYOffset)
-	keybindsLabel.BackgroundTransparency = 0.8
-	keybindsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	keybindsLabel.BorderSizePixel = 0
-	keybindsLabel.Font = Enum.Font.SourceSans
-	keybindsLabel.TextSize = 12
-	keybindsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	keybindsLabel.TextWrapped = true
-	keybindsLabel.TextXAlignment = Enum.TextXAlignment.Left
-	keybindsLabel.TextYAlignment = Enum.TextYAlignment.Top
-	keybindsLabel.Text = string.format(
-        "%s: TP Parts\n%s: TP Troll Part\n%s: TP To Location\n%s: Toggle AntiFall\n%s: Toggle Detect E\n%s: Toggle Detect Q\n%s: Toggle Fly\n%s: Toggle Platform",
-        TRIGGER_KEY_Q.Name, TRIGGER_KEY_E.Name, TRIGGER_KEY_R.Name, TRIGGER_KEY_F.Name,
-        TRIGGER_KEY_G.Name, TRIGGER_KEY_H.Name, TRIGGER_KEY_FLY.Name, TRIGGER_KEY_PLATFORM.Name
-    )
-	keybindsLabel.Parent = screenGui
-	keybindsLabelRef = keybindsLabel
-	print("Keybinds Info UI created/updated.")
-end
-
-local function createMobileUI()
-	local screenGui = getOrCreateScreenGui()
-	local oldFrame = screenGui:FindFirstChild("ButtonFrame")
-	if oldFrame then oldFrame:Destroy() end
-	local oldToggle = screenGui:FindFirstChild("ToggleButton")
-	if oldToggle then oldToggle:Destroy() end
-
-	local guiInset = GuiService:GetGuiInset()
-	local topPadding = 5
-
-	local buttonWidth = 80
-	local buttonHeight = 35
-	local buttonPadding = 5
-	local buttonsPerRow = 4
-	local numRows = 2
-
-	local frameWidth = (buttonWidth * buttonsPerRow) + (buttonPadding * (buttonsPerRow - 1))
-	local frameHeight = (buttonHeight * numRows) + (buttonPadding * (numRows - 1))
-
-	local buttonFrame = Instance.new("Frame")
-	buttonFrame.Name = "ButtonFrame"
-	buttonFrame.BackgroundTransparency = 1
-	buttonFrame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
-	buttonFrame.Visible = true
-	buttonFrame.Parent = screenGui
-
-	local function createMobileButton(name, text, rowIndex, colIndex, color, borderColor, clickFunction)
-		local button = Instance.new("TextButton")
-		button.Name = name
-		button.Text = text
-		button.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
-		local posX = (buttonWidth + buttonPadding) * colIndex
-		local posY = (buttonHeight + buttonPadding) * rowIndex
-		button.Position = UDim2.new(0, posX, 0, posY)
-		button.BackgroundColor3 = color
-		button.BorderColor3 = borderColor
-		button.TextColor3 = Color3.fromRGB(255, 255, 255)
-		button.Font = Enum.Font.SourceSansBold
-		button.TextSize = 13 -- Slightly smaller text size for potentially longer labels
-		button.TextWrapped = true -- Allow text wrapping
-		button.Parent = buttonFrame
-		if clickFunction then
-			button.MouseButton1Click:Connect(clickFunction)
-		end
-		return button
-	end
-
-	local buttonQ = createMobileButton("TeleportButtonQ", "Q: TP Parts", 0, 0, Color3.fromRGB(80, 80, 200), Color3.fromRGB(20, 20, 50), function() handlePartTeleport(TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "Button Q") end)
-	local buttonE = createMobileButton("TeleportButtonE", "E: TP Troll", 0, 1, Color3.fromRGB(200, 80, 80), Color3.fromRGB(50, 20, 20), function() handlePartTeleport(TARGET_PART_NAME_E, TELEPORT_DURATION_E, "Button E") end)
-	local buttonR = createMobileButton("TeleportButtonR", "R: TP Loc", 0, 2, Color3.fromRGB(80, 200, 80), Color3.fromRGB(20, 50, 20), function() teleportPlayerToCoords(TARGET_POSITION_R, "Button R") end)
-	antiFallButtonRef = createMobileButton("AntiFallButton", "F: AntiFall", 0, 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleAntiFall)
-
-	gFuncButtonRef = createMobileButton("DetectButtonG", "G: Detect E", 1, 0, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleGFunc)
-	hFuncButtonRef = createMobileButton("DetectButtonH", "H: Detect Q", 1, 1, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleHFunc)
-	flyButtonRef = createMobileButton("FlyButton", "X: Fly", 1, 2, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), toggleFly)
-	platformButtonRef = createMobileButton("PlatformButton", "P: Platform", 1, 3, Color3.fromRGB(200, 50, 50), Color3.fromRGB(30, 30, 30), togglePlatform)
-
-	local toggleButton = Instance.new("TextButton")
-	toggleButton.Name = "ToggleButton"
-	toggleButton.Text = ">"
-	toggleButton.Size = UDim2.new(0, 30, 0, buttonHeight)
-
-	local lowestLabelY = topPadding + guiInset.Y
-	if platformStatusLabelRef and platformStatusLabelRef.Parent then
-		lowestLabelY = platformStatusLabelRef.Position.Y.Offset + platformStatusLabelRef.AbsoluteSize.Y
-    elseif flyStatusLabelRef and flyStatusLabelRef.Parent then
-        lowestLabelY = flyStatusLabelRef.Position.Y.Offset + flyStatusLabelRef.AbsoluteSize.Y
-	elseif hFuncStatusLabelRef and hFuncStatusLabelRef.Parent then
-		lowestLabelY = hFuncStatusLabelRef.Position.Y.Offset + hFuncStatusLabelRef.AbsoluteSize.Y
-	elseif gFuncStatusLabelRef and gFuncStatusLabelRef.Parent then
-		lowestLabelY = gFuncStatusLabelRef.Position.Y.Offset + gFuncStatusLabelRef.AbsoluteSize.Y
-	elseif antiFallStatusLabelRef and antiFallStatusLabelRef.Parent then
-		lowestLabelY = antiFallStatusLabelRef.Position.Y.Offset + antiFallStatusLabelRef.AbsoluteSize.Y
-	end
-	local toggleYOffset = lowestLabelY + 10
-
-	toggleButton.Position = UDim2.new(1, -45, 0, toggleYOffset)
-	toggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-	toggleButton.BorderColor3 = Color3.fromRGB(50, 50, 50)
-	toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	toggleButton.Font = Enum.Font.SourceSansBold
-	toggleButton.TextSize = 24
-	toggleButton.AutoButtonColor = false
-	toggleButton.Parent = screenGui
-	uiToggleButtonRef = toggleButton
-
-	local function updateFramePosition()
-        task.wait()
-		buttonFrame.Position = UDim2.new(
-			toggleButton.Position.X.Scale, toggleButton.Position.X.Offset - buttonFrame.AbsoluteSize.X - 10,
-			toggleButton.Position.Y.Scale, toggleButton.Position.Y.Offset
-		)
-	end
-
-	updateFramePosition()
-	updateAntiFallMobileButton()
-	updateGFuncMobileButton()
-	updateHFuncMobileButton()
-	updateFlyMobileButton()
-	updatePlatformMobileButton()
-
-	local dragging = false
-	local dragInput = nil
-	local dragStart = nil
-	local startPos = nil
-
-	toggleButton.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = toggleButton.Position
-			dragInput = input
-
-			local connection
-			connection = input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					if dragging and (input.Position - dragStart).Magnitude < 5 then
-						buttonFrame.Visible = not buttonFrame.Visible
-						toggleButton.Text = buttonFrame.Visible and ">" or "<"
-						if buttonFrame.Visible then
-							updateFramePosition()
-						end
-					end
-					dragging = false
-					dragInput = nil
-					if connection then connection:Disconnect() end
-				end
-			end)
-		end
-	end)
-
-	toggleButton.InputChanged:Connect(function(input)
-		if input == dragInput and dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			if (input.Position - dragStart).Magnitude >= 5 then
-				local delta = input.Position - dragStart
-				toggleButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-				updateFramePosition()
-			end
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if input == dragInput and dragging then
-			dragging = false
-			dragInput = nil
-		end
-	end)
-
-	print("Mobile controls UI created/updated.")
-end
-
-local function hideInitialParts()
-	print("Hiding initial Q parts...")
-	local partsHidden = 0
-	for _, descendant in ipairs(Workspace:GetDescendants()) do
-		if descendant:IsA("BasePart") and descendant.Name == TARGET_PART_NAME_Q then
-			setVisibilityRecursive(descendant, false, {})
-			partsHidden = partsHidden + 1
-		end
-	end
-	print("Finished hiding initial Q parts. Count:", partsHidden)
-end
-
+-- Detection Visualizers
+local gVisualizerPartRef = nil
+local hVisualizerPartRef = nil
 local function createDetectionVisualizers()
 	if not gVisualizerPartRef or not gVisualizerPartRef.Parent then
         if gVisualizerPartRef then gVisualizerPartRef:Destroy() end
@@ -974,6 +600,7 @@ local function createDetectionVisualizers()
 	end)
 end
 
+-- Game Loops
 RunService.RenderStepped:Connect(function(deltaTime)
 	if isAntiFallEnabled then
 		local currentTime = tick()
@@ -1060,15 +687,104 @@ local function detectNearbyPlayersAndTriggerQ_Loop()
 	end
 end
 
+-- Initialization
 local uiSuccess, uiError = pcall(function()
     print("Initializing UI and World Objects...")
-	createStatusLabelsUI()
-	if not UserInputService.TouchEnabled then
-		createKeybindsLabelUI()
-	end
-	if UserInputService.TouchEnabled then
-		createMobileUI()
-	end
+
+    -- Create Rayfield UI
+    local Window = Rayfield:CreateWindow({
+        Name = "Script Controls",
+        LoadingTitle = "Loading Script...",
+        LoadingSubtitle = "by You",
+        ConfigurationSaving = {
+            Enabled = false, -- Disable Rayfield's saving if you handle it elsewhere
+            FolderName = nil,
+            FileName = "ScriptConfig"
+        },
+        KeySystem = false -- Assuming no key system needed
+    })
+
+    local MainTab = Window:CreateTab("Main", 4483362458) -- Example icon ID
+
+    MainTab:CreateButton({
+        Name = "TP Parts (Q)",
+        Callback = function()
+            pcall(handlePartTeleport, TARGET_PART_NAME_Q, TELEPORT_DURATION_Q, "UI Button Q")
+        end,
+    })
+
+    MainTab:CreateButton({
+        Name = "TP Troll Part (E)",
+        Callback = function()
+            pcall(handlePartTeleport, TARGET_PART_NAME_E, TELEPORT_DURATION_E, "UI Button E")
+        end,
+    })
+
+     MainTab:CreateButton({
+        Name = "TP Location (R)",
+        Callback = function()
+            pcall(teleportPlayerToCoords, TARGET_POSITION_R, "UI Button R")
+        end,
+    })
+
+    MainTab:CreateLabel("Toggles:")
+
+    antiFallToggleRef = MainTab:CreateToggle({
+        Name = "Anti-Fall (F)",
+        CurrentValue = isAntiFallEnabled,
+        Flag = "AntiFallToggle", -- Optional flag for saving/loading if needed
+        Callback = function(Value)
+            -- Check if the state actually changed before toggling
+            if isAntiFallEnabled ~= Value then
+                toggleAntiFall()
+            end
+        end,
+    })
+
+    gFuncToggleRef = MainTab:CreateToggle({
+        Name = "Detect E (G)",
+        CurrentValue = isGFuncEnabled,
+        Flag = "DetectEToggle",
+        Callback = function(Value)
+             if isGFuncEnabled ~= Value then
+                toggleGFunc()
+            end
+        end,
+    })
+
+     hFuncToggleRef = MainTab:CreateToggle({
+        Name = "Detect Q (H)",
+        CurrentValue = isHFuncEnabled,
+        Flag = "DetectQToggle",
+        Callback = function(Value)
+             if isHFuncEnabled ~= Value then
+                toggleHFunc()
+            end
+        end,
+    })
+
+    flyToggleRef = MainTab:CreateToggle({
+        Name = "Fly (X)",
+        CurrentValue = FLYING,
+        Flag = "FlyToggle",
+        Callback = function(Value)
+             if FLYING ~= Value then
+                toggleFly()
+            end
+        end,
+    })
+
+    platformToggleRef = MainTab:CreateToggle({
+        Name = "Platform (P)",
+        CurrentValue = isPlatformVisible,
+        Flag = "PlatformToggle",
+        Callback = function(Value)
+            if isPlatformVisible ~= Value then
+                togglePlatform()
+            end
+        end,
+    })
+
 	createDetectionVisualizers()
     createPlatform()
     print("Initialization complete.")
@@ -1078,10 +794,12 @@ if not uiSuccess then
 	warn("Error during UI/World Initialization:", uiError)
 end
 
+-- Start Detection Loops
 task.spawn(detectNearbyPlayersAndTriggerE_Loop)
 task.spawn(detectNearbyPlayersAndTriggerQ_Loop)
 print("Detection loops started.")
 
+-- Connect Input Handling (Keep keybinds active alongside UI)
 local inputSuccess, inputError = pcall(function()
     if flyKeyDownConnection then flyKeyDownConnection:Disconnect(); flyKeyDownConnection = nil end
     if flyKeyUpConnection then flyKeyUpConnection:Disconnect(); flyKeyUpConnection = nil end
@@ -1103,18 +821,23 @@ local inputSuccess, inputError = pcall(function()
 		elseif keyCode == TRIGGER_KEY_F then
             print("F Key Pressed")
 			pcall(toggleAntiFall)
+            if antiFallToggleRef then antiFallToggleRef:Set(isAntiFallEnabled) end -- Update UI on keypress
 		elseif keyCode == TRIGGER_KEY_G then
             print("G Key Pressed")
 			pcall(toggleGFunc)
+            if gFuncToggleRef then gFuncToggleRef:Set(isGFuncEnabled) end
 		elseif keyCode == TRIGGER_KEY_H then
             print("H Key Pressed")
 			pcall(toggleHFunc)
+            if hFuncToggleRef then hFuncToggleRef:Set(isHFuncEnabled) end
 		elseif keyCode == TRIGGER_KEY_FLY then
             print("X Key Pressed")
             pcall(toggleFly)
+            if flyToggleRef then flyToggleRef:Set(FLYING) end
         elseif keyCode == TRIGGER_KEY_PLATFORM then
             print("P Key Pressed")
             pcall(togglePlatform)
+            if platformToggleRef then platformToggleRef:Set(isPlatformVisible) end
 		end
 	end)
 end)
@@ -1125,6 +848,7 @@ else
 	print("Teleporting, Anti-Fall, Player Detect, Fly & Platform script input handler loaded. Keys: Q, E, R, F, G, H, X, P.")
 end
 
+-- Respawn Handling
 LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     print("CharacterAdded event fired. Updating references and recreating objects.")
     task.wait(0.2)
@@ -1148,8 +872,6 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     end
     createDetectionVisualizers()
     createPlatform()
-    createStatusLabelsUI()
-    if not UserInputService.TouchEnabled then createKeybindsLabelUI() end
-    if UserInputService.TouchEnabled then createMobileUI() end
+    -- No need to recreate UI elements as Rayfield persists
     print("Respawn setup complete.")
 end)
